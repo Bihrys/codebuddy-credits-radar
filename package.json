@@ -23,7 +23,7 @@
       },
       {
         "command": "codebuddyUsage.setCookie",
-        "title": "CodeBuddy Usage: 设置登录 Cookie"
+        "title": "CodeBuddy Usage: 设置登录凭证（Cookie + User-Agent）"
       },
       {
         "command": "codebuddyUsage.openUsagePage",
@@ -45,6 +45,11 @@
           "type": "string",
           "default": "",
           "description": "从 workbuddy.cn 官网复制的登录 Cookie（仅存于本地）"
+        },
+        "codebuddyUsage.userAgent": {
+          "type": "string",
+          "default": "",
+          "description": "浏览器 User-Agent（仅存于本地）。留空使用内置默认值 Chrome/153。必须与 Cookie 取自同一个请求，否则服务端判定会话不匹配并返回 401"
         },
         "codebuddyUsage.refreshIntervalMinutes": {
           "type": "number",

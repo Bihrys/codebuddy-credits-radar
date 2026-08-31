@@ -11,8 +11,8 @@
 1. 安装依赖：`npm install`
 2. 编译：`npm run compile`
 3. 按 `F5` 在「扩展开发宿主」窗口中调试运行；或打包：`npm install -g @vscode/vsce && vsce package` 得到 `.vsix` 后安装。
-4. 打开命令面板（`Cmd+Shift+P`）→ 运行 **`CodeBuddy Usage: 设置登录 Cookie`**。
-5. 粘贴你从官网网页端复制的登录 Cookie（详见下方「安全说明」），保存后即可使用。
+4. 打开命令面板（`Cmd+Shift+P`）→ 运行 **`CodeBuddy Usage: 设置登录凭证`**。
+5. 在弹出的表单里粘贴 Cookie 与 User-Agent（详见下方「安全说明」与「关于 User-Agent」），保存后即可使用。
 6. 状态栏右下角即显示余量（纯数字）：`⚡ 2431.68`。
    悬浮可查看总量、占比、各套餐明细，以及底部左侧的**当日签到状态标签**。
    点击状态栏可手动刷新余量（若当日尚未签到会自动领取积分）。
@@ -36,9 +36,26 @@
 
 > 已签到 / 领取成功时**不弹提示**，仅领取失败时才提示，避免每次刷新都打扰。
 
+## 关于 User-Agent（重要）
+
+服务端签发会话时会把**完整的 User-Agent 记进会话**，后续请求的 UA 必须与之**逐字符一致**，否则返回 401。实测结论：
+
+- Cookie 有效 + UA 不匹配 → `401`
+- 只有签发时那个浏览器的 UA 能过，相邻版本（如 151 与 152/153）互不通用
+- 改动 UA 中任意一个片段（Safari 版本、AppleWebKit 版本、Mac↔Windows、甚至小版本号）都会被拒
+
+因此 **Cookie 与 User-Agent 必须复制自同一个请求**：
+
+1. 打开 `https://www.workbuddy.cn/profile/plans-usage` 并登录
+2. `F12` → `Network` 面板 → 选中任意一个 `get-user-resource` 请求
+3. `Headers` → `Request Headers`，分别右键 Copy value：
+   - `cookie:`
+   - `user-agent:`
+
 ## 配置项（Settings）
 
 - `codebuddyUsage.cookie`：登录 Cookie（本地存储，用于拉取用量）
+- `codebuddyUsage.userAgent`：浏览器 User-Agent（本地存储）。留空则使用内置默认值 `Chrome/153`。**必须与 Cookie 取自同一请求**
 - `codebuddyUsage.refreshIntervalMinutes`：自动刷新间隔，默认 30 分钟，0 关闭
 - `codebuddyUsage.autoCheckin`：是否启用自动每日签到领取积分（默认 `true`）；关闭后不执行签到，悬浮框也不显示签到状态
 - `codebuddyUsage.apiBase`：国内 `https://www.workbuddy.cn`，国际 `https://www.workbuddy.ai`
@@ -60,5 +77,6 @@
 
 - Cookie **仅存于你本机的 VS Code 全局配置**，不会上传任何地方。
 - Cookie 有有效期，失效后状态栏会提示「Cookie 已失效」，重新复制一次即可。
+- 失效也可能是 UA 与 Cookie 不匹配所致，此时重新复制两者（同一请求）即可恢复，见「关于 User-Agent」。
 - 签到与用量查询共用配置的 Cookie（`codebuddyUsage.cookie`），仅在本地用于调用官方接口，不会上传第三方。
 - **建议**：本扩展用的登录态请勿外泄；使用完毕后可在官网退出登录使其失效。
