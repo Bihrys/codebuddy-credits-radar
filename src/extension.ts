@@ -651,185 +651,68 @@ function scheduleTimer() {
 }
 
 /**
- * 凭证录入表单（Cookie + User-Agent）。
+ * 凭证录入：顺序弹出两个输入框（Cookie → User-Agent）。
  *
- * 用 Webview 而非 showInputBox 的原因：
- *  1. 需要两个字段，showInputBox 只有单行输入；
- *  2. 需要可点击跳转的链接，showInputBox 的 prompt 仅支持纯文本；
- *  3. 需要一段较长的「去哪儿复制、怎么复制」说明，输入框放不下。
+ * 为什么是两个框而不是一个表单：
+ *  VS Code 的 showInputBox 一次只收一个值，无法容纳两个字段；
+ *  这里改为连续弹出两次，并在标题上标注 (1/2)(2/2) 提示当前进度。
+ *
+ * 取消语义：任一步按 Esc 都整体放弃，不写入任何值。
+ *  因为 Cookie 与 UA 必须配对，只更新其中一个反而会立刻 401，
+ *  半途写入比完全不写更糟。
  */
-function credentialFormHtml(
-  webview: vscode.Webview,
-  cookie: string,
-  userAgent: string
-): string {
-  const esc = (s: string) =>
-    s
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  const nonce = Array.from({ length: 32 }, () =>
-    "abcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(Math.random() * 36)]
-  ).join("");
-  const usageUrl = "https://www.workbuddy.cn/profile/plans-usage";
-
-  return `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
-<style nonce="${nonce}">
-  body {
-    font-family: var(--vscode-font-family);
-    font-size: var(--vscode-font-size);
-    color: var(--vscode-foreground);
-    background: var(--vscode-editor-background);
-    padding: 14px 20px; margin: 0; line-height: 1.6;
-  }
-  a { color: var(--vscode-textLink-foreground); text-decoration: none; }
-  a:hover { color: var(--vscode-textLink-activeForeground); text-decoration: underline; }
-  h2 { font-size: 15px; margin: 0 0 3px; font-weight: 600; }
-  .hint { color: var(--vscode-descriptionForeground); font-size: 12px; margin: 0 0 14px; }
-  ol { margin: 0 0 18px; padding-left: 20px; font-size: 13px; }
-  li { margin-bottom: 4px; }
-  ul { margin: 4px 0; padding-left: 18px; }
-  code {
-    background: var(--vscode-textCodeBlock-background);
-    padding: 1px 5px; border-radius: 3px;
-    font-family: var(--vscode-editor-font-family); font-size: 12px;
-  }
-  label { display: block; font-weight: 600; margin: 0 0 5px; font-size: 13px; }
-  .sub { font-weight: 400; color: var(--vscode-descriptionForeground); font-size: 12px; }
-  textarea {
-    width: 100%; box-sizing: border-box;
-    background: var(--vscode-input-background);
-    color: var(--vscode-input-foreground);
-    border: 1px solid var(--vscode-input-border, transparent);
-    border-radius: 3px; padding: 7px 9px;
-    font-family: var(--vscode-editor-font-family);
-    font-size: 12px; line-height: 1.5; resize: vertical; margin-bottom: 15px;
-  }
-  textarea:focus { outline: 1px solid var(--vscode-focusBorder); }
-  .row { display: flex; gap: 8px; align-items: center; }
-  button {
-    padding: 5px 16px; border: none; border-radius: 3px; cursor: pointer;
-    font-family: var(--vscode-font-family); font-size: 13px;
-  }
-  .primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
-  .primary:hover { background: var(--vscode-button-hoverBackground); }
-  .secondary { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
-  .secondary:hover { background: var(--vscode-button-secondaryHoverBackground); }
-  .tip { color: var(--vscode-descriptionForeground); font-size: 12px; }
-  .warn {
-    background: var(--vscode-inputValidation-warningBackground, transparent);
-    border-left: 3px solid var(--vscode-inputValidation-warningBorder, transparent);
-    padding: 8px 11px; margin-bottom: 16px; font-size: 12.5px;
-  }
-</style>
-</head>
-<body>
-<h2>设置登录凭证</h2>
-<p class="hint">
-  从 <a href="${usageUrl}">workbuddy.cn</a> 复制 Cookie 与 User-Agent，仅保存在本机。
-</p>
-
-<div class="warn">
-  <strong>Cookie 与 User-Agent 必须来自同一个请求。</strong>
-  服务端签发会话时会绑定完整 UA，两者不匹配将返回 401。
-</div>
-
-<ol>
-  <li>打开 <a href="${usageUrl}">${usageUrl}</a> 并登录</li>
-  <li>按 <code>F12</code> → 切到 <code>Network</code> 面板</li>
-  <li>选中任意一个 <code>get-user-resource</code> 请求</li>
-  <li>在 <code>Headers</code> → <code>Request Headers</code> 中分别复制：
-    <ul>
-      <li><code>cookie:</code> 右键 → Copy value</li>
-      <li><code>user-agent:</code> 右键 → Copy value</li>
-    </ul>
-  </li>
-  <li>粘贴到下方并保存</li>
-</ol>
-
-<label for="cookie">Cookie</label>
-<textarea id="cookie" rows="6" spellcheck="false"
-  placeholder="qcloud_from=...; session=...; session_2=...; i18next=zh-CN">${esc(cookie)}</textarea>
-
-<label for="ua">User-Agent <span class="sub">留空则使用内置默认值（Chrome/153）</span></label>
-<textarea id="ua" rows="3" spellcheck="false"
-  placeholder="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36">${esc(userAgent)}</textarea>
-
-<div class="row">
-  <button class="primary" id="save">保存</button>
-  <button class="secondary" id="cancel">取消</button>
-  <span class="tip">⌘/Ctrl + Enter 保存 · Esc 取消</span>
-</div>
-
-<script nonce="${nonce}">
-  const vscode = acquireVsCodeApi();
-  const cookieEl = document.getElementById('cookie');
-  const uaEl = document.getElementById('ua');
-  document.getElementById('save').addEventListener('click', () => {
-    vscode.postMessage({
-      type: 'save',
-      cookie: cookieEl.value,
-      userAgent: uaEl.value
-    });
-  });
-  document.getElementById('cancel').addEventListener('click', () => {
-    vscode.postMessage({ type: 'cancel' });
-  });
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      document.getElementById('save').click();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      document.getElementById('cancel').click();
-    }
-  });
-</script>
-</body>
-</html>`;
-}
-
 async function setCookie() {
   const cfg = getConfig();
-  const panel = vscode.window.createWebviewPanel(
-    "codebuddyUsageCredentials",
-    "设置登录凭证",
-    vscode.ViewColumn.Active,
-    { enableScripts: true, retainContextWhenHidden: false }
-  );
-  panel.webview.html = credentialFormHtml(
-    panel.webview,
-    cfg.get<string>("cookie", ""),
-    cfg.get<string>("userAgent", "")
+
+  // (1/2) Cookie
+  const cookie = await vscode.window.showInputBox({
+    title: "(1/2) 登录凭证 — Cookie",
+    prompt: "粘贴从 www.workbuddy.cn/profile/plans-usage 复制的 Cookie",
+    placeHolder: "qcloud_from=...; session=...; session_2=...; i18next=zh-CN",
+    value: cfg.get<string>("cookie", ""),
+    ignoreFocusOut: true,
+  });
+  // Esc：整体放弃
+  if (cookie === undefined) return;
+
+  // (2/2) User-Agent
+  const uaVer = DEFAULT_UA.match(/Chrome\/[\d.]+/)?.[0] ?? DEFAULT_UA;
+  const userAgent = await vscode.window.showInputBox({
+    title: "(2/2) 登录凭证 — User-Agent",
+    prompt: `必须与 Cookie 取自同一个请求，否则返回 401。留空则使用内置默认值（${uaVer}）`,
+    placeHolder: DEFAULT_UA,
+    value: cfg.get<string>("userAgent", ""),
+    ignoreFocusOut: true,
+  });
+  // Esc：整体放弃，避免 Cookie 已更新而 UA 仍是旧的，两者不匹配
+  if (userAgent === undefined) {
+    vscode.window.showInformationMessage(
+      "CodeBuddy Usage: 已取消，Cookie 与 User-Agent 均未保存"
+    );
+    return;
+  }
+
+  try {
+    await cfg.update("cookie", cookie.trim(), vscode.ConfigurationTarget.Global);
+    await cfg.update("userAgent", userAgent.trim(), vscode.ConfigurationTarget.Global);
+  } catch (e: any) {
+    vscode.window.showErrorMessage(
+      `CodeBuddy Usage: 凭证保存失败（${e?.message ?? String(e)}）`
+    );
+    return;
+  }
+
+  // 回显实际生效的 UA，便于确认是否真的存进去了
+  const ver = getUA().match(/Chrome\/[\d.]+/)?.[0] ?? "未知版本";
+  const isDefault = !userAgent.trim();
+  vscode.window.showInformationMessage(
+    `CodeBuddy Usage: 凭证已保存（仅存于本地），生效 UA：${ver}${isDefault ? "（内置默认值）" : ""}`
   );
 
-  panel.webview.onDidReceiveMessage(async (msg: any) => {
-    if (msg?.type === "save") {
-      await cfg.update(
-        "cookie",
-        String(msg.cookie ?? "").trim(),
-        vscode.ConfigurationTarget.Global
-      );
-      await cfg.update(
-        "userAgent",
-        String(msg.userAgent ?? "").trim(),
-        vscode.ConfigurationTarget.Global
-      );
-      vscode.window.showInformationMessage("CodeBuddy Usage: 凭证已保存（仅存于本地）");
-      panel.dispose();
-      // 配置项变更会触发 onDidChangeConfiguration 中的 update()；
-      // 此处再调一次是为了覆盖「只改了 UA、cookie 未变」的情况，
-      // update() 内部的 updating 守卫会保证并发只生效一次。
-      update();
-    } else if (msg?.type === "cancel") {
-      panel.dispose();
-    }
-  });
+  // 配置变更会触发 onDidChangeConfiguration 中的 update()；
+  // 此处再调一次覆盖「只改了 UA、cookie 未变」的情况，
+  // update() 内部的 updating 守卫保证并发只生效一次。
+  update();
 }
 
 /** 手动「领积分」：领取喵喵挣的积分（独立于自动流程，由悬浮框链接触发） */
