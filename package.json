@@ -5,6 +5,29 @@
   "publisher": "wwenc6621",
   "version": "0.5.0",
   "icon": "resources/icon.png",
+  "license": "MIT",
+  "keywords": [
+    "CodeBuddy",
+    "WorkBuddy",
+    "腾讯云代码助手",
+    "credits",
+    "积分",
+    "余量",
+    "usage",
+    "statusbar"
+  ],
+  "galleryBanner": {
+    "color": "#1e415e",
+    "theme": "dark"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wwenc6621/CodeBuddy-Usage.git"
+  },
+  "bugs": {
+    "url": "https://github.com/wwenc6621/CodeBuddy-Usage/issues"
+  },
+  "homepage": "https://github.com/wwenc6621/CodeBuddy-Usage#readme",
   "engines": {
     "vscode": "^1.85.0"
   },
