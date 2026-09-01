@@ -43,6 +43,7 @@ let lastUpdatedAt;
 let lastCheckin;
 let lastBuddy;
 let lastBuddyAutoDate = ""; // 本地日期字符串，用于「一日一次」自动触发守卫
+let lastBuddyClaimDate = ""; // 本地日期字符串，用于「一日一次」自动领积分守卫（与出发守卫解耦）
 /** 防止并发 update 互相覆盖导致状态栏反复闪动/丢失 */
 let updating = false;
 const DEFAULT_PACKAGE_CODES = [
@@ -69,16 +70,16 @@ function getConfig() {
     return vscode.workspace.getConfiguration("codebuddyUsage");
 }
 /**
- * 状态栏图标：codicon（$(icon) 语法）仅在标准 VS Code 宿主中渲染，
- * 其他宿主（如 CodeBuddy IDE）不解析该语法，回退为 Unicode 符号保证可见。
+ * 状态栏图标：统一使用 codicon（$(icon) 语法）。
+ * 所有基于 VS Code 内核的宿主（VS Code / Trae / CodeBuddy IDE 等）
+ * 的状态栏均按同一套逻辑渲染 `$(icon)`，因此不再按 appName 区分，
+ * 保证各宿主显示一致。
  *
  * 注意：状态栏文本里 `$(icon)` 会渲染；hover Markdown 不识别该语法，
  * 需直接用 Unicode/emoji。
  */
-function icon(codicon, unicode) {
-    // 标准 VS Code（含 Insiders）使用 codicon，其余宿主回退 Unicode
-    const appName = (vscode.env.appName ?? "").toLowerCase();
-    return appName.includes("visual studio code") ? `$(${codicon})` : unicode;
+function icon(codicon) {
+    return `$(${codicon})`;
 }
 // ============================================================
 // 1. 用量拉取
@@ -391,13 +392,20 @@ async function ensureBuddy() {
     if (!status)
         return undefined;
     const buddy = { status };
-    const canDepart = status.state != null && status.state !== "traveling" && !status.dailyLimitReached;
-    if (canDepart && lastBuddyAutoDate !== todayStr()) {
+    const backFromTravel = status.state != null && status.state !== "traveling";
+    // 修复：领积分与「出发」解耦。旅行结束后喵喵处于「已到达」状态，
+    // 此时即使当日已达上限（dailyLimitReached=true，无法再出发），
+    // 也必须尝试领取本次旅行挣到的积分，否则积分会一直滞留在服务端。
+    if (backFromTravel && lastBuddyClaimDate !== todayStr()) {
         const c = await claimBuddy().catch((e) => ({ error: e?.message ?? String(e) }));
         if (c.credit != null)
             buddy.claim = { credit: c.credit };
         else if (c.error)
             buddy.claim = { error: c.error };
+        lastBuddyClaimDate = todayStr();
+    }
+    const canDepart = backFromTravel && !status.dailyLimitReached;
+    if (canDepart && lastBuddyAutoDate !== todayStr()) {
         const d = await departBuddy().catch((e) => ({ error: e?.message ?? String(e) }));
         if (d.hours != null)
             buddy.depart = { hours: d.hours };
@@ -433,7 +441,7 @@ function parseExpiry(s) {
 // 状态栏渲染（纯数字样式）
 // ============================================================
 function renderResult(res, updatedAt) {
-    statusBarItem.text = `${icon("zap", "⚡")} ${formatNumber(res.remain)}`;
+    statusBarItem.text = `${icon("zap")} ${formatNumber(res.remain)}`;
     statusBarItem.tooltip = buildTooltip(res, updatedAt);
     statusBarItem.backgroundColor = undefined;
     statusBarItem.show();
@@ -446,7 +454,7 @@ async function update() {
         return;
     updating = true;
     // 立即给出刷新反馈，避免点击后“无变化”的错觉
-    statusBarItem.text = `${icon("sync~spin", "🔄")} 刷新中…`;
+    statusBarItem.text = `${icon("sync~spin")} 刷新中…`;
     statusBarItem.tooltip = "正在拉取 CodeBuddy 用量…";
     statusBarItem.backgroundColor = undefined;
     statusBarItem.show();
@@ -480,21 +488,21 @@ async function update() {
     catch (e) {
         const msg = e?.message ?? String(e);
         if (msg === "NO_COOKIE") {
-            statusBarItem.text = `${icon("key", "🔑")} 未设置 Cookie`;
+            statusBarItem.text = `${icon("key")} 未设置 Cookie`;
             statusBarItem.tooltip = "点击设置登录 Cookie";
             statusBarItem.command = "codebuddyUsage.setCookie";
             statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
             statusBarItem.show();
         }
         else if (msg === "COOKIE_EXPIRED") {
-            statusBarItem.text = `${icon("error", "❌")} Cookie 已失效`;
+            statusBarItem.text = `${icon("error")} Cookie 已失效`;
             statusBarItem.tooltip = "点击重新设置登录 Cookie";
             statusBarItem.command = "codebuddyUsage.setCookie";
             statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
             statusBarItem.show();
         }
         else {
-            statusBarItem.text = `${icon("warning", "⚠️")} 拉取失败`;
+            statusBarItem.text = `${icon("warning")} 拉取失败`;
             statusBarItem.tooltip = `错误: ${msg}\n点击重试`;
             statusBarItem.command = "codebuddyUsage.refresh";
             statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
@@ -535,8 +543,16 @@ function buddyTag() {
         const pad = (n) => String(n).padStart(2, "0");
         return `✿ 旅行倒计时 ${pad(hh)}:${pad(mm)}:${pad(ss)}`;
     }
-    // 今日喵喵任务已完成（达到每日领取/出发上限）：不再展示「领积分 / 去旅行」按钮
+    // 今日喵喵任务已完成（达到每日领取/出发上限）：
+    // 若本次刷新有领取结果则一并展示，避免「已到达但积分未领取」被误导为已完成
     if (b.status.dailyLimitReached) {
+        const c = b.claim;
+        if (c && c.credit != null) {
+            return `✿ 今日已完成 · ${c.credit > 0 ? `已领取 ${c.credit} 积分` : "无积分可领"}`;
+        }
+        if (c && c.error) {
+            return `✿ 今日已完成 · 领积分失败 (${c.error})`;
+        }
         return "✿ 今日已完成，明天再来吧";
     }
     // 空闲/已到达：展示可点击的「领积分」「去旅行」，或操作结果
@@ -697,7 +713,7 @@ async function buddyClaimCmd() {
     }
     catch (e) {
         if (e?.message === "COOKIE_EXPIRED") {
-            statusBarItem.text = `${icon("error", "❌")} Cookie 已失效`;
+            statusBarItem.text = `${icon("error")} Cookie 已失效`;
             statusBarItem.tooltip = "点击重新设置登录 Cookie";
             statusBarItem.command = "codebuddyUsage.setCookie";
             statusBarItem.show();
@@ -728,7 +744,7 @@ async function buddyDepartCmd() {
     }
     catch (e) {
         if (e?.message === "COOKIE_EXPIRED") {
-            statusBarItem.text = `${icon("error", "❌")} Cookie 已失效`;
+            statusBarItem.text = `${icon("error")} Cookie 已失效`;
             statusBarItem.tooltip = "点击重新设置登录 Cookie";
             statusBarItem.command = "codebuddyUsage.setCookie";
             statusBarItem.show();
@@ -745,7 +761,7 @@ function activate(context) {
     // 高优先级（>=100）保证在状态栏空间紧张时不被挤掉，从而稳定常驻显示
     statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
     statusBarItem.command = "codebuddyUsage.refresh";
-    statusBarItem.text = `${icon("zap", "⚡")} …`;
+    statusBarItem.text = `${icon("zap")} …`;
     statusBarItem.show();
     context.subscriptions.push(statusBarItem);
     context.subscriptions.push(vscode.commands.registerCommand("codebuddyUsage.showDetail", () => update()));
