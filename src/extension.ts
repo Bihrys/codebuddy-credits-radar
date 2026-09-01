@@ -374,7 +374,11 @@ async function claimBuddy(): Promise<{ credit?: number; error?: string }> {
   try {
     const json = await callBuddyApi("claim", "POST", "{}");
     if (json?.code === 0) return { credit: json?.data?.credit ?? 0 };
-    return { error: json?.msg ?? `HTTP_${json?.code ?? ""}` };
+    const msg = json?.msg ?? `HTTP_${json?.code ?? ""}`;
+    // 服务端返回 no unclaimed travel 表示「当前没有可领取的旅行积分」，
+    // 属于正常状态（如积分已被之前的流程领取过），不算失败
+    if (/no unclaimed/i.test(msg)) return { credit: 0 };
+    return { error: msg };
   } catch (e: any) {
     if (e?.message === "COOKIE_EXPIRED" || e?.message === "NO_COOKIE") throw e;
     return { error: e?.message ?? String(e) };
