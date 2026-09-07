@@ -15,7 +15,7 @@ All notable changes are documented in this file.
 
 ### Changed
 
-- Shortened the English hover tooltip tags (e.g. `✿ Done today`, `✿ Countdown 03:12:45`) so the combined status row stays compact.
+- Shortened the English tooltip strings (status tags, table headers, summary line, …) so the tooltip stays as compact as the Chinese one and no longer wraps inside columns.
 
 ### Fixed
 

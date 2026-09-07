@@ -638,9 +638,7 @@ function buddyTag(): string {
   if (b.status.dailyLimitReached) {
     const c: any = b.claim;
     if (c && c.credit != null) {
-      return c.credit > 0
-        ? t("✿ Done today · +{0}", c.credit)
-        : t("✿ Done today · no credits");
+      return c.credit > 0 ? t("✿ Done today · +{0}", c.credit) : t("✿ Done today");
     }
     if (c && c.error) {
       return t("✿ Claim failed ({0})", c.error);
@@ -699,27 +697,19 @@ function buildTooltip(res: UsageResult, updatedAt?: Date): vscode.MarkdownString
   lines.push(t("### CodeBuddy Credits"));
   lines.push(``);
   lines.push(
-    t(
-      "Total: `{0}` remaining / [total {1}]({2}) ({3}%)",
-      totalRemain,
-      totalSize,
-      plansUrl,
-      pct.toFixed(1)
-    )
+    t("Remaining: `{0}` / [{1}]({2}) ({3}%)", totalRemain, totalSize, plansUrl, pct.toFixed(1))
   );
   if (visible.length > 5) {
     lines.push(``);
-    lines.push(
-      t("_{0} packages with remaining credits, showing the first 5_", visible.length)
-    );
+    lines.push(t("_{0} packages, showing the first 5_", visible.length));
   }
   lines.push(``);
-  lines.push(t("| Package | Remaining | Total | Expires |"));
+  lines.push(t("| Package | Left | Total | Expires |"));
   // 末列右对齐，使底部“最近更新”贴住表格右缘
   lines.push(`| --- | ---: | ---: | ---: |`);
 
   if (visible.length === 0) {
-    lines.push(t("| _No packages with remaining credits_ |  |  |  |"));
+    lines.push(t("| _No packages left_ |  |  |  |"));
   } else {
     for (const a of visible.slice(0, 5)) {
       const remain = formatNumber(
@@ -738,7 +728,7 @@ function buildTooltip(res: UsageResult, updatedAt?: Date): vscode.MarkdownString
   const buddy = buddyTag();
   const left = [tag, buddy].filter(Boolean).join("  ");
   if (updatedAt) {
-    lines.push(t("| {0} |  | Last updated | {1} |", left, formatDateTime(updatedAt)));
+    lines.push(t("| {0} |  | Updated | {1} |", left, formatDateTime(updatedAt)));
   } else if (left) {
     lines.push(`| ${left} |  |  |  |`);
   }
