@@ -1,83 +1,104 @@
 # CodeBuddy Usage（VS Code 扩展）
 
-在 VS Code **状态栏右下角**自动显示腾讯 CodeBuddy 的积分余量，无需手填数字。
+在 VS Code 状态栏显示你的 CodeBuddy 积分余量，顺手把每天能领的积分自动领了。
 
-## 原理
+---
 
-扩展在本地通过官网公开网页端已有的登录态，调用对应的用量查询接口，对你名下所有生效中的资源包余量求和，显示在状态栏。所有请求均在你本机发起，仅依赖你自己的登录 Cookie，不涉及任何第三方服务。
+## 三步开始用
 
-## 使用步骤
+### 1. 安装扩展
 
-1. 安装依赖：`npm install`
-2. 编译：`npm run compile`
-3. 按 `F5` 在「扩展开发宿主」窗口中调试运行；或打包：`npm install -g @vscode/vsce && vsce package` 得到 `.vsix` 后安装。
-4. 打开命令面板（`Cmd+Shift+P`）→ 运行 **`CodeBuddy Usage: 设置登录凭证`**。
-5. 依次在弹出的两个输入框中粘贴 Cookie 与 User-Agent（详见下方「安全说明」与「关于 User-Agent」），保存后即可使用。
-   两个框标题分别标注 `(1/2)`、`(2/2)`；任一步按 `Esc` 会整体取消，不会写入半个凭证。
-6. 状态栏右下角即显示余量（纯数字）：`⚡ 2431.68`。
-   悬浮可查看总量、占比、各套餐明细，以及底部左侧的**当日签到状态标签**。
-   点击状态栏可手动刷新余量（若当日尚未签到会自动领取积分）。
+在扩展市场搜 `CodeBuddy Usage` 安装，或安装 `.vsix` 文件。
 
-## 自动签到
+### 2. 从官网复制两串东西
 
-扩展会在每次刷新余量时检测腾讯官方每日签到状态；若当日尚未签到，则自动领取积分（100 积分/天）。
+> **关于域名**：腾讯的「CodeBuddy」和「WorkBuddy」是同一套账号和后台，
+> 登录其中任意一个官网就能用这个扩展，不需要单独注册。
+> 本扩展默认拉取的是 WorkBuddy 官网的接口数据（因为它的页面有积分可以领取），
+> 所以**第一步打开 WorkBuddy 官网**登录即可。
 
-**提示策略**：当日首次自动领取成功时，弹出「今日积分已领取（+N）」提示；若当日早已签到（接口幂等返回）则静默不弹，避免每次刷新都打扰；仅领取失败时才弹警告。
+1. 浏览器打开 [https://www.workbuddy.cn/profile/plans-usage](https://www.workbuddy.cn/profile/plans-usage) 并登录
+2. 按 `F12` 打开开发者工具 → 切到 `Network`（网络）面板 → 刷新一下页面
+3. 在请求列表里筛选`Fecht/XHR`类型，然后选择一个，比如  `get-user-resource`
+4. 右侧 `Headers` → `Request Headers`，在 `cookie` 这一行右键 **Copy value**：
 
-### 签到状态标签
+   ![复制 Cookie](https://raw.githubusercontent.com/wwenc6621/CodeBuddy-Usage/main/resources/docs/copy-cookie.png)
+5. 在同一个请求里继续往下翻，找到 `user-agent` 行，同样右键 **Copy value**：
 
-悬浮框**最底部一行、最左侧**显示当日签到状态（与「最近更新」同一行）：
+   ![复制 User-Agent](https://raw.githubusercontent.com/wwenc6621/CodeBuddy-Usage/main/resources/docs/copy-useragent.png)
 
-| 状态   | 标签                  |
-| ------ | --------------------- |
-| 已领取 | `✓ 已领取`         |
-| 未领取 | `○ 未领取`         |
-| 异常   | `⚠ 异常`（附原因） |
-| 未知   | `❔ 未知`           |
+> 它们是一对的，分开复制、或者留了旧的那个，都可能提示「Cookie 已失效」。
 
-> 已签到 / 领取成功时**不弹提示**，仅领取失败时才提示，避免每次刷新都打扰。
+### 3. 粘贴到 VS Code
 
-## 关于 User-Agent（重要）
+`Cmd/Ctrl + Shift + P` → 运行 **`CodeBuddy Usage: 设置登录凭证（Cookie + User-Agent）`** →
+先粘 Cookie 回车，再粘 User-Agent 回车。
 
-服务端签发会话时会把**完整的 User-Agent 记进会话**，后续请求的 UA 必须与之**逐字符一致**，否则返回 401。实测结论：
+右下角状态栏会显示余量，例如 `⚡ 2431.68`。鼠标悬停上去就能看明细：
 
-- Cookie 有效 + UA 不匹配 → `401`
-- 只有签发时那个浏览器的 UA 能过，相邻版本（如 151 与 152/153）互不通用
-- 改动 UA 中任意一个片段（Safari 版本、AppleWebKit 版本、Mac↔Windows、甚至小版本号）都会被拒
+![状态栏与悬浮框](https://raw.githubusercontent.com/wwenc6621/CodeBuddy-Usage/main/resources/docs/tooltip-preview.png)
 
-因此 **Cookie 与 User-Agent 必须复制自同一个请求**：
+---
 
-1. 打开 `https://www.workbuddy.cn/profile/plans-usage` 并登录
-2. `F12` → `Network` 面板 → 选中任意一个 `get-user-resource` 请求
-3. `Headers` → `Request Headers`，分别右键 Copy value：
-   - `cookie:`
-   - `user-agent:`
+## 日常使用
 
-## 配置项（Settings）
+| 想做什么                             | 怎么做                           |
+| ------------------------------------ | -------------------------------- |
+| 看余量                               | 直接看状态栏数字                 |
+| 看明细（总量、占比、各套餐到期时间） | 鼠标悬停在状态栏上               |
+| 手动刷新                             | 点一下状态栏                     |
+| 手动领积分 / 派喵喵                  | 点悬浮框里的「领积分」「去旅行」 |
 
-- `codebuddyUsage.cookie`：登录 Cookie（本地存储，用于拉取用量）
-- `codebuddyUsage.userAgent`：浏览器 User-Agent（本地存储）。留空则使用内置默认值 `Chrome/153`。**必须与 Cookie 取自同一请求**
-- `codebuddyUsage.refreshIntervalMinutes`：自动刷新间隔，默认 30 分钟，0 关闭
-- `codebuddyUsage.autoCheckin`：是否启用自动每日签到领取积分（默认 `true`）；关闭后不执行签到，悬浮框也不显示签到状态
-- `codebuddyUsage.apiBase`：国内 `https://www.workbuddy.cn`，国际 `https://www.workbuddy.ai`
-- `codebuddyUsage.buddyTravel`：是否启用**喵喵旅行**（派喵喵出任务自动赚积分），默认 `true`。开启后（默认即开启），每次刷新会先领取喵喵挣的积分再派出喵喵出任务（一日一次），悬浮框在「已签到」旁展示喵喵状态。
+默认每 30 分钟自动刷新一次。
 
-## 喵喵旅行（派喵喵赚积分）
+### 每天自动帮你领的积分
 
-开启 `codebuddyUsage.buddyTravel` 后，扩展接入官方「派喵喵赚积分」活动，逻辑如下：
+装好就不用管了，下面两件事都会自动做：
 
-- **自动流程**：每次刷新（含自动签到后、手动刷新）会先查询喵喵当前状态；若喵喵空闲且当日尚未触发，则先领取积分，再派出喵喵出任务。**一日仅自动触发一次**（派出后状态变为「旅行中」，自然无法再次触发，并辅以本地日期守卫防止同日往返后重复出发）。
-- **悬浮框展示**（「已签到」旁边）：
-  - 旅行中：`✿ 旅行倒计时 HH:MM:SS`（不自动刷新走秒）
-  - 空闲：`✿ [领积分] · [去旅行]`（均为可点击链接）
-  - 点击「领积分」后展示 `已领取 xx 积分`；点击「去旅行」后展示 `旅行时长 x 小时`
-- **手动触发**：悬浮框中的「领积分」「去旅行」链接可单独点击，不等自动流程（仅当 `buddyTravel` 开启时显示）。
-- 同样依赖 `codebuddyUsage.cookie` 与用量/签到共用，不依赖桌面端。Cookie 失效时随用量一并提示。
+- **每日签到** —— 每天自动签到领积分
+- **喵喵旅行** —— 自动把喵喵挣的积分领了，再派它出去赚下一趟
 
-## 安全说明
+成功了右下角会弹一条提示告诉你领到多少；没什么可领、或者今天已经领过了，就不会打扰你。
 
-- Cookie **仅存于你本机的 VS Code 全局配置**，不会上传任何地方。
-- Cookie 有有效期，失效后状态栏会提示「Cookie 已失效」，重新复制一次即可。
-- 失效也可能是 UA 与 Cookie 不匹配所致，此时重新复制两者（同一请求）即可恢复，见「关于 User-Agent」。
-- 签到与用量查询共用配置的 Cookie（`codebuddyUsage.cookie`），仅在本地用于调用官方接口，不会上传第三方。
-- **建议**：本扩展用的登录态请勿外泄；使用完毕后可在官网退出登录使其失效。
+悬停状态栏时，底部会显示今天的状态，例如 `✓ 已签到`、`✿ 旅行倒计时 03:12:45`。
+
+---
+
+## 出问题了？
+
+| 现象                        | 怎么办                                                |
+| --------------------------- | ----------------------------------------------------- |
+| 状态栏显示「未设置 Cookie」 | 点它，走一遍上面的第 2、3 步                          |
+| 显示「Cookie 已失效」       | Cookie 过期了，或者和 UA 不是一对，重新复制一次       |
+| 显示「拉取失败」            | 点状态栏重试一次                                      |
+| 数字一直不变                | 点一下状态栏手动刷新                                  |
+| 用的是国际站                | 设置里把`apiBase` 改成 `https://www.workbuddy.ai` |
+
+---
+
+## 设置项
+
+在 VS Code 设置里搜 `codebuddyUsage`：
+
+| 设置                       | 默认                         | 说明                                                 |
+| -------------------------- | ---------------------------- | ---------------------------------------------------- |
+| `cookie`                 | 空                           | 登录后复制的那串                                     |
+| `userAgent`              | 空                           | 留空用内置默认值，**必须和 Cookie 同一次复制** |
+| `refreshIntervalMinutes` | 30                           | 自动刷新间隔（分钟），填 0 关闭                      |
+| `autoCheckin`            | 开                           | 自动每日签到                                         |
+| `buddyTravel`            | 开                           | 自动喵喵旅行                                         |
+| `apiBase`                | `https://www.workbuddy.cn` | 国内站；国际站填`https://www.workbuddy.ai`         |
+
+## 安全
+
+- Cookie 和 User-Agent **只存在你本机的 VS Code 配置里**，不会上传到任何地方，也不会经过第三方。
+- 别把这两串发给别人。不用了就在官网退出登录，它们立刻失效。
+
+## 自己编译
+
+```bash
+npm install
+npm run compile   # 或按 F5 在扩展开发宿主窗口中调试
+```
+
+打包：`npm install -g @vscode/vsce && vsce package`

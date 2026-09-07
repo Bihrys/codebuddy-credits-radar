@@ -3,7 +3,7 @@
   "displayName": "CodeBuddy Usage",
   "description": "在 VS Code 状态栏显示腾讯 CodeBuddy 积分/余量（自动拉取官网用量接口）",
   "publisher": "wwenc6621",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "icon": "resources/icon.png",
   "license": "MIT",
   "keywords": [

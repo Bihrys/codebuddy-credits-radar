@@ -403,19 +403,27 @@ async function ensureBuddy() {
     // 也必须尝试领取本次旅行挣到的积分，否则积分会一直滞留在服务端。
     if (backFromTravel && lastBuddyClaimDate !== todayStr()) {
         const c = await claimBuddy().catch((e) => ({ error: e?.message ?? String(e) }));
-        if (c.credit != null)
+        if (c.credit != null) {
             buddy.claim = { credit: c.credit };
-        else if (c.error)
+            // 只有真正到账才标记提示；credit=0（当前无可领取的旅行）保持静默
+            if (c.credit > 0)
+                buddy.freshlyClaimed = true;
+        }
+        else if (c.error) {
             buddy.claim = { error: c.error };
+        }
         lastBuddyClaimDate = todayStr();
     }
     const canDepart = backFromTravel && !status.dailyLimitReached;
     if (canDepart && lastBuddyAutoDate !== todayStr()) {
         const d = await departBuddy().catch((e) => ({ error: e?.message ?? String(e) }));
-        if (d.hours != null)
+        if (d.hours != null) {
             buddy.depart = { hours: d.hours };
-        else if (d.error)
+            buddy.freshlyDeparted = true;
+        }
+        else if (d.error) {
             buddy.depart = { error: d.error };
+        }
         const st2 = await fetchBuddyStatus();
         if (st2)
             buddy.status = st2;
@@ -450,6 +458,34 @@ function renderResult(res, updatedAt) {
     statusBarItem.tooltip = buildTooltip(res, updatedAt);
     statusBarItem.backgroundColor = undefined;
     statusBarItem.show();
+}
+/**
+ * 喵喵旅行结果提示，与签到保持同一策略：
+ * 本次真正操作成功（领到积分 / 派出成功）才弹信息提示；
+ * 无可领取、今日已完成、已在旅行中均静默，避免每 30 分钟自动刷新反复打扰。
+ * 仅操作失败时弹警告（受「一日一次」守卫限制，一天最多一次）。
+ */
+function notifyBuddyResult(buddy) {
+    if (!buddy)
+        return;
+    const claim = buddy.claim;
+    const depart = buddy.depart;
+    const parts = [];
+    if (buddy.freshlyClaimed && claim?.credit != null) {
+        parts.push(`已领取 ${claim.credit} 积分`);
+    }
+    else if (claim?.error) {
+        vscode.window.showWarningMessage(`CodeBuddy Usage: 喵喵领积分失败（${claim.error}）`);
+    }
+    if (buddy.freshlyDeparted && depart?.hours != null) {
+        parts.push(`喵喵已出发，旅行时长 ${depart.hours} 小时`);
+    }
+    else if (depart?.error) {
+        vscode.window.showWarningMessage(`CodeBuddy Usage: 喵喵出发失败（${depart.error}）`);
+    }
+    if (parts.length > 0) {
+        vscode.window.showInformationMessage(`CodeBuddy Usage: 喵喵旅行 — ${parts.join("，")}`);
+    }
 }
 async function update() {
     if (!statusBarItem)
@@ -489,6 +525,8 @@ async function update() {
         else if (autoCheckin && checkin?.state === "unclaimed") {
             vscode.window.showWarningMessage("CodeBuddy Usage: 今日积分签到失败，稍后重试");
         }
+        // 喵喵旅行：与签到一致，仅在本次真正领到积分/派出成功时提示
+        notifyBuddyResult(buddy);
     }
     catch (e) {
         const msg = e?.message ?? String(e);
@@ -708,11 +746,16 @@ async function buddyClaimCmd() {
         const c = await claimBuddy();
         if (c.error) {
             lastBuddy.claim = { error: c.error };
+            vscode.window.showWarningMessage(`CodeBuddy Usage: 喵喵领积分失败（${c.error}）`);
         }
         else {
             lastBuddy.claim = { credit: c.credit ?? 0 };
             if ((c.credit ?? 0) > 0) {
                 vscode.window.showInformationMessage(`CodeBuddy Usage: 喵喵已领取 ${c.credit} 积分`);
+            }
+            else {
+                // 手动点击也要有反馈，否则点了「领积分」没有任何回应
+                vscode.window.showInformationMessage("CodeBuddy Usage: 喵喵当前没有可领取的旅行积分");
             }
         }
     }
@@ -725,6 +768,7 @@ async function buddyClaimCmd() {
             return;
         }
         lastBuddy.claim = { error: e?.message ?? String(e) };
+        vscode.window.showWarningMessage(`CodeBuddy Usage: 喵喵领积分失败（${e?.message ?? String(e)}）`);
     }
     const st = await fetchBuddyStatus();
     if (st)
@@ -741,6 +785,7 @@ async function buddyDepartCmd() {
         const d = await departBuddy();
         if (d.error) {
             lastBuddy.depart = { error: d.error };
+            vscode.window.showWarningMessage(`CodeBuddy Usage: 喵喵出发失败（${d.error}）`);
         }
         else {
             lastBuddy.depart = { hours: d.hours ?? 0 };
@@ -756,6 +801,7 @@ async function buddyDepartCmd() {
             return;
         }
         lastBuddy.depart = { error: e?.message ?? String(e) };
+        vscode.window.showWarningMessage(`CodeBuddy Usage: 喵喵出发失败（${e?.message ?? String(e)}）`);
     }
     const st = await fetchBuddyStatus();
     if (st)
