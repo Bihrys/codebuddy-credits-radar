@@ -10,3 +10,7 @@ node_modules/**
 tsconfig.json
 package-lock.json
 *.vsix
+
+# README 中的截图走 GitHub 远程加载（raw.githubusercontent.com），
+# 扩展详情页的 webview 无法解析包内相对路径，故不再随包发布
+resources/docs/**
