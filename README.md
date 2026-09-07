@@ -1,5 +1,7 @@
 # CodeBuddy Usage（VS Code 扩展）
 
+[English](./README.en.md) | 简体中文
+
 在 VS Code 状态栏显示你的 CodeBuddy 积分余量，顺手把每天能领的积分自动领了。
 
 ---
@@ -19,7 +21,7 @@
 
 1. 浏览器打开 [https://www.workbuddy.cn/profile/plans-usage](https://www.workbuddy.cn/profile/plans-usage) 并登录
 2. 按 `F12` 打开开发者工具 → 切到 `Network`（网络）面板 → 刷新一下页面
-3. 在请求列表里筛选`Fecht/XHR`类型，然后选择一个，比如  `get-user-resource`
+3. 在请求列表里筛选 `Fetch/XHR` 类型，然后选择一个，比如 `get-user-resource`
 4. 右侧 `Headers` → `Request Headers`，在 `cookie` 这一行右键 **Copy value**：
 
    ![复制 Cookie](https://raw.githubusercontent.com/wwenc6621/CodeBuddy-Usage/main/resources/docs/copy-cookie.png)

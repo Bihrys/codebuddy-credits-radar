@@ -36,6 +36,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.activate = activate;
 exports.deactivate = deactivate;
 const vscode = __importStar(require("vscode"));
+/**
+ * 本地化入口：语言自动跟随 VS Code 显示语言（vscode.env.language）。
+ * 代码内文案统一写英文（即默认语言），简体中文译文见 l10n/bundle.l10n.zh-cn.json；
+ * 未命中译文时 l10n 会自动回落为传入的英文原文。
+ */
+function t(message, ...args) {
+    return vscode.l10n.t(message, ...args.map((a) => a ?? ""));
+}
 let statusBarItem;
 let timer;
 let lastResult;
@@ -275,7 +283,7 @@ async function doCheckin() {
 async function ensureCheckin() {
     const cookie = getConfig().get("cookie", "").trim();
     if (!cookie) {
-        return { state: "unknown", error: "未设置 Cookie" };
+        return { state: "unknown", error: t("No Cookie set") };
     }
     const status = await fetchCheckinStatus();
     if (status.state === "claimed") {
@@ -472,19 +480,19 @@ function notifyBuddyResult(buddy) {
     const depart = buddy.depart;
     const parts = [];
     if (buddy.freshlyClaimed && claim?.credit != null) {
-        parts.push(`已领取 ${claim.credit} 积分`);
+        parts.push(t("Claimed {0} credits", claim.credit));
     }
     else if (claim?.error) {
-        vscode.window.showWarningMessage(`CodeBuddy Usage: 喵喵领积分失败（${claim.error}）`);
+        vscode.window.showWarningMessage(t("CodeBuddy Usage: Failed to claim buddy credits ({0})", claim.error));
     }
     if (buddy.freshlyDeparted && depart?.hours != null) {
-        parts.push(`喵喵已出发，旅行时长 ${depart.hours} 小时`);
+        parts.push(t("Buddy departed, travel time {0} hours", depart.hours));
     }
     else if (depart?.error) {
-        vscode.window.showWarningMessage(`CodeBuddy Usage: 喵喵出发失败（${depart.error}）`);
+        vscode.window.showWarningMessage(t("CodeBuddy Usage: Buddy failed to depart ({0})", depart.error));
     }
     if (parts.length > 0) {
-        vscode.window.showInformationMessage(`CodeBuddy Usage: 喵喵旅行 — ${parts.join("，")}`);
+        vscode.window.showInformationMessage(t("CodeBuddy Usage: Buddy travel — {0}", parts.join(", ")));
     }
 }
 async function update() {
@@ -495,8 +503,8 @@ async function update() {
         return;
     updating = true;
     // 立即给出刷新反馈，避免点击后“无变化”的错觉
-    statusBarItem.text = `${icon("sync~spin")} 刷新中…`;
-    statusBarItem.tooltip = "正在拉取 CodeBuddy 用量…";
+    statusBarItem.text = `${icon("sync~spin")} ${t("Refreshing…")}`;
+    statusBarItem.tooltip = t("Fetching CodeBuddy usage…");
     statusBarItem.backgroundColor = undefined;
     statusBarItem.show();
     try {
@@ -520,10 +528,12 @@ async function update() {
         statusBarItem.command = "codebuddyUsage.refresh";
         // 仅首次领取成功 / 领取失败才提示；早已签到则静默（避免每次点击都弹）
         if (autoCheckin && checkin?.freshlyClaimed) {
-            vscode.window.showInformationMessage(`CodeBuddy Usage: 今日积分已签到${checkin.credit ? `（+${checkin.credit}）` : ""}`);
+            vscode.window.showInformationMessage(checkin.credit
+                ? t("CodeBuddy Usage: Daily check-in done (+{0})", checkin.credit)
+                : t("CodeBuddy Usage: Daily check-in done"));
         }
         else if (autoCheckin && checkin?.state === "unclaimed") {
-            vscode.window.showWarningMessage("CodeBuddy Usage: 今日积分签到失败，稍后重试");
+            vscode.window.showWarningMessage(t("CodeBuddy Usage: Daily check-in failed, will retry later"));
         }
         // 喵喵旅行：与签到一致，仅在本次真正领到积分/派出成功时提示
         notifyBuddyResult(buddy);
@@ -531,22 +541,22 @@ async function update() {
     catch (e) {
         const msg = e?.message ?? String(e);
         if (msg === "NO_COOKIE") {
-            statusBarItem.text = `${icon("key")} 未设置 Cookie`;
-            statusBarItem.tooltip = "点击设置登录 Cookie";
+            statusBarItem.text = `${icon("key")} ${t("No Cookie set")}`;
+            statusBarItem.tooltip = t("Click to set login Cookie");
             statusBarItem.command = "codebuddyUsage.setCookie";
             statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
             statusBarItem.show();
         }
         else if (msg === "COOKIE_EXPIRED") {
-            statusBarItem.text = `${icon("error")} Cookie 已失效`;
-            statusBarItem.tooltip = "点击重新设置登录 Cookie";
+            statusBarItem.text = `${icon("error")} ${t("Cookie expired")}`;
+            statusBarItem.tooltip = t("Click to re-set login Cookie");
             statusBarItem.command = "codebuddyUsage.setCookie";
             statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
             statusBarItem.show();
         }
         else {
-            statusBarItem.text = `${icon("warning")} 拉取失败`;
-            statusBarItem.tooltip = `错误: ${msg}\n点击重试`;
+            statusBarItem.text = `${icon("warning")} ${t("Fetch failed")}`;
+            statusBarItem.tooltip = t("Error: {0}\nClick to retry", msg);
             statusBarItem.command = "codebuddyUsage.refresh";
             statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
             statusBarItem.show();
@@ -562,12 +572,14 @@ function checkinTag() {
         return "";
     // Hover Markdown 不支持 $(icon) 语法，直接用 Unicode 符号表达签到状态
     if (!lastCheckin)
-        return "`❔ 未知`";
+        return t("`❔ Unknown`");
     if (lastCheckin.state === "claimed")
-        return "`✓ 已签到`";
+        return t("`✓ Checked in`");
     if (lastCheckin.state === "unclaimed")
-        return "`○ 未签到`";
-    return `\`⚠ 异常${lastCheckin.error ? ` (${lastCheckin.error})` : ""}\``;
+        return t("`○ Not checked in`");
+    return lastCheckin.error
+        ? t("`⚠ Error ({0})`", lastCheckin.error)
+        : t("`⚠ Error`");
 }
 /** 悬浮框中「喵喵」状态标签：旅行倒计时 / 领积分 / 去旅行（可点击） */
 function buddyTag() {
@@ -575,7 +587,7 @@ function buddyTag() {
         return "";
     const b = lastBuddy;
     if (!b || !b.status)
-        return "✿ `未知`";
+        return t("✿ `Unknown`");
     if (b.status.state === "traveling") {
         // 静态倒计时：基于接口返回的 serverNow 与 arriveAt 计算，悬浮框展示时显示一次即可，不自动刷新
         const nowSec = b.status.serverNow ?? Math.floor(Date.now() / 1000);
@@ -584,33 +596,37 @@ function buddyTag() {
         const mm = Math.floor((remain % 3600) / 60);
         const ss = remain % 60;
         const pad = (n) => String(n).padStart(2, "0");
-        return `✿ 旅行倒计时 ${pad(hh)}:${pad(mm)}:${pad(ss)}`;
+        return t("✿ Travel countdown {0}:{1}:{2}", pad(hh), pad(mm), pad(ss));
     }
     // 今日喵喵任务已完成（达到每日领取/出发上限）：
     // 若本次刷新有领取结果则一并展示，避免「已到达但积分未领取」被误导为已完成
     if (b.status.dailyLimitReached) {
         const c = b.claim;
         if (c && c.credit != null) {
-            return `✿ 今日已完成 · ${c.credit > 0 ? `已领取 ${c.credit} 积分` : "无积分可领"}`;
+            return c.credit > 0
+                ? t("✿ Done for today · {0} credits claimed", c.credit)
+                : t("✿ Done for today · no credits to claim");
         }
         if (c && c.error) {
-            return `✿ 今日已完成 · 领积分失败 (${c.error})`;
+            return t("✿ Done for today · claim failed ({0})", c.error);
         }
-        return "✿ 今日已完成，明天再来吧";
+        return t("✿ Done for today, come back tomorrow");
     }
     // 空闲/已到达：展示可点击的「领积分」「去旅行」，或操作结果
     const parts = [];
     if (b.claim && b.claim.credit != null) {
-        parts.push(b.claim.credit > 0 ? `已领取 ${b.claim.credit} 积分` : `无积分可领`);
+        parts.push(b.claim.credit > 0
+            ? t("{0} credits claimed", b.claim.credit)
+            : t("No credits to claim"));
     }
     else {
-        parts.push(`[领积分](command:codebuddyUsage.buddyClaim "领取喵喵挣的积分")`);
+        parts.push(t('[Claim](command:codebuddyUsage.buddyClaim "Claim credits earned by your buddy")'));
     }
     if (b.depart && b.depart.hours != null) {
-        parts.push(`旅行时长 ${b.depart.hours} 小时`);
+        parts.push(t("Travel time {0} hours", b.depart.hours));
     }
     else {
-        parts.push(`[去旅行](command:codebuddyUsage.buddyDepart "派喵喵出任务赚积分")`);
+        parts.push(t('[Depart](command:codebuddyUsage.buddyDepart "Send your buddy on a task to earn credits")'));
     }
     return `✿ ${parts.join(" · ")}`;
 }
@@ -631,20 +647,23 @@ function buildTooltip(res, updatedAt) {
         return (parseFloat(r) || 0) > 0;
     })
         .sort((a, b) => parseExpiry(a.CycleEndTime) - parseExpiry(b.CycleEndTime));
+    const plansUrl = `${getConfig()
+        .get("apiBase", "https://www.workbuddy.cn")
+        .replace(/\/$/, "")}/profile/plans-usage`;
     const lines = [];
-    lines.push(`### CodeBuddy 积分余量`);
+    lines.push(t("### CodeBuddy Credits"));
     lines.push(``);
-    lines.push(`总计：剩余 \`${totalRemain}\` / 总量 [${totalSize}](https://www.workbuddy.cn/profile/plans-usage) （${pct.toFixed(1)}%）`);
+    lines.push(t("Total: `{0}` remaining / [total {1}]({2}) ({3}%)", totalRemain, totalSize, plansUrl, pct.toFixed(1)));
     if (visible.length > 5) {
         lines.push(``);
-        lines.push(`_共 ${visible.length} 个有余量套餐，仅显示前 5 条_`);
+        lines.push(t("_{0} packages with remaining credits, showing the first 5_", visible.length));
     }
     lines.push(``);
-    lines.push(`| 套餐 | 剩余 | 总量 | 到期 |`);
+    lines.push(t("| Package | Remaining | Total | Expires |"));
     // 末列右对齐，使底部“最近更新”贴住表格右缘
     lines.push(`| --- | ---: | ---: | ---: |`);
     if (visible.length === 0) {
-        lines.push(`| _暂无有余量的套餐_ |  |  |  |`);
+        lines.push(t("| _No packages with remaining credits_ |  |  |  |"));
     }
     else {
         for (const a of visible.slice(0, 5)) {
@@ -660,7 +679,7 @@ function buildTooltip(res, updatedAt) {
     const buddy = buddyTag();
     const left = [tag, buddy].filter(Boolean).join("  ");
     if (updatedAt) {
-        lines.push(`| ${left} |  | 最近更新 | ${formatDateTime(updatedAt)} |`);
+        lines.push(t("| {0} |  | Last updated | {1} |", left, formatDateTime(updatedAt)));
     }
     else if (left) {
         lines.push(`| ${left} |  |  |  |`);
@@ -696,8 +715,8 @@ async function setCookie() {
     const cfg = getConfig();
     // (1/2) Cookie
     const cookie = await vscode.window.showInputBox({
-        title: "(1/2) 登录凭证 — Cookie",
-        prompt: "粘贴从 www.workbuddy.cn/profile/plans-usage 复制的 Cookie",
+        title: t("(1/2) Login credentials — Cookie"),
+        prompt: t("Paste the Cookie copied from www.workbuddy.cn/profile/plans-usage"),
         placeHolder: "qcloud_from=...; session=...; session_2=...; i18next=zh-CN",
         value: cfg.get("cookie", ""),
         ignoreFocusOut: true,
@@ -708,15 +727,15 @@ async function setCookie() {
     // (2/2) User-Agent
     const uaVer = DEFAULT_UA.match(/Chrome\/[\d.]+/)?.[0] ?? DEFAULT_UA;
     const userAgent = await vscode.window.showInputBox({
-        title: "(2/2) 登录凭证 — User-Agent",
-        prompt: `必须与 Cookie 取自同一个请求，否则返回 401。留空则使用内置默认值（${uaVer}）`,
+        title: t("(2/2) Login credentials — User-Agent"),
+        prompt: t("Must come from the same request as the Cookie, otherwise the server returns 401. Leave empty to use the built-in default ({0})", uaVer),
         placeHolder: DEFAULT_UA,
         value: cfg.get("userAgent", ""),
         ignoreFocusOut: true,
     });
     // Esc：整体放弃，避免 Cookie 已更新而 UA 仍是旧的，两者不匹配
     if (userAgent === undefined) {
-        vscode.window.showInformationMessage("CodeBuddy Usage: 已取消，Cookie 与 User-Agent 均未保存");
+        vscode.window.showInformationMessage(t("CodeBuddy Usage: Cancelled, neither Cookie nor User-Agent was saved"));
         return;
     }
     try {
@@ -724,13 +743,15 @@ async function setCookie() {
         await cfg.update("userAgent", userAgent.trim(), vscode.ConfigurationTarget.Global);
     }
     catch (e) {
-        vscode.window.showErrorMessage(`CodeBuddy Usage: 凭证保存失败（${e?.message ?? String(e)}）`);
+        vscode.window.showErrorMessage(t("CodeBuddy Usage: Failed to save credentials ({0})", e?.message ?? String(e)));
         return;
     }
     // 回显实际生效的 UA，便于确认是否真的存进去了
-    const ver = getUA().match(/Chrome\/[\d.]+/)?.[0] ?? "未知版本";
+    const ver = getUA().match(/Chrome\/[\d.]+/)?.[0] ?? t("unknown version");
     const isDefault = !userAgent.trim();
-    vscode.window.showInformationMessage(`CodeBuddy Usage: 凭证已保存（仅存于本地），生效 UA：${ver}${isDefault ? "（内置默认值）" : ""}`);
+    vscode.window.showInformationMessage(isDefault
+        ? t("CodeBuddy Usage: Credentials saved (local only), active UA: {0} (built-in default)", ver)
+        : t("CodeBuddy Usage: Credentials saved (local only), active UA: {0}", ver));
     // 配置变更会触发 onDidChangeConfiguration 中的 update()；
     // 此处再调一次覆盖「只改了 UA、cookie 未变」的情况，
     // update() 内部的 updating 守卫保证并发只生效一次。
@@ -746,29 +767,29 @@ async function buddyClaimCmd() {
         const c = await claimBuddy();
         if (c.error) {
             lastBuddy.claim = { error: c.error };
-            vscode.window.showWarningMessage(`CodeBuddy Usage: 喵喵领积分失败（${c.error}）`);
+            vscode.window.showWarningMessage(t("CodeBuddy Usage: Failed to claim buddy credits ({0})", c.error));
         }
         else {
             lastBuddy.claim = { credit: c.credit ?? 0 };
             if ((c.credit ?? 0) > 0) {
-                vscode.window.showInformationMessage(`CodeBuddy Usage: 喵喵已领取 ${c.credit} 积分`);
+                vscode.window.showInformationMessage(t("CodeBuddy Usage: Buddy claimed {0} credits", c.credit));
             }
             else {
                 // 手动点击也要有反馈，否则点了「领积分」没有任何回应
-                vscode.window.showInformationMessage("CodeBuddy Usage: 喵喵当前没有可领取的旅行积分");
+                vscode.window.showInformationMessage(t("CodeBuddy Usage: Your buddy has no travel credits to claim right now"));
             }
         }
     }
     catch (e) {
         if (e?.message === "COOKIE_EXPIRED") {
-            statusBarItem.text = `${icon("error")} Cookie 已失效`;
-            statusBarItem.tooltip = "点击重新设置登录 Cookie";
+            statusBarItem.text = `${icon("error")} ${t("Cookie expired")}`;
+            statusBarItem.tooltip = t("Click to re-set login Cookie");
             statusBarItem.command = "codebuddyUsage.setCookie";
             statusBarItem.show();
             return;
         }
         lastBuddy.claim = { error: e?.message ?? String(e) };
-        vscode.window.showWarningMessage(`CodeBuddy Usage: 喵喵领积分失败（${e?.message ?? String(e)}）`);
+        vscode.window.showWarningMessage(t("CodeBuddy Usage: Failed to claim buddy credits ({0})", e?.message ?? String(e)));
     }
     const st = await fetchBuddyStatus();
     if (st)
@@ -785,23 +806,23 @@ async function buddyDepartCmd() {
         const d = await departBuddy();
         if (d.error) {
             lastBuddy.depart = { error: d.error };
-            vscode.window.showWarningMessage(`CodeBuddy Usage: 喵喵出发失败（${d.error}）`);
+            vscode.window.showWarningMessage(t("CodeBuddy Usage: Buddy failed to depart ({0})", d.error));
         }
         else {
             lastBuddy.depart = { hours: d.hours ?? 0 };
-            vscode.window.showInformationMessage(`CodeBuddy Usage: 喵喵已出发，旅行时长 ${d.hours ?? 0} 小时`);
+            vscode.window.showInformationMessage(t("CodeBuddy Usage: Buddy departed, travel time {0} hours", d.hours ?? 0));
         }
     }
     catch (e) {
         if (e?.message === "COOKIE_EXPIRED") {
-            statusBarItem.text = `${icon("error")} Cookie 已失效`;
-            statusBarItem.tooltip = "点击重新设置登录 Cookie";
+            statusBarItem.text = `${icon("error")} ${t("Cookie expired")}`;
+            statusBarItem.tooltip = t("Click to re-set login Cookie");
             statusBarItem.command = "codebuddyUsage.setCookie";
             statusBarItem.show();
             return;
         }
         lastBuddy.depart = { error: e?.message ?? String(e) };
-        vscode.window.showWarningMessage(`CodeBuddy Usage: 喵喵出发失败（${e?.message ?? String(e)}）`);
+        vscode.window.showWarningMessage(t("CodeBuddy Usage: Buddy failed to depart ({0})", e?.message ?? String(e)));
     }
     const st = await fetchBuddyStatus();
     if (st)

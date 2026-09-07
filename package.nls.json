@@ -1,0 +1,15 @@
+{
+  "extension.description": "Show Tencent CodeBuddy credits / remaining quota in the VS Code status bar (auto-fetches the official usage API)",
+  "command.refresh": "CodeBuddy Usage: Refresh quota",
+  "command.setCookie": "CodeBuddy Usage: Set login credentials (Cookie + User-Agent)",
+  "command.openUsagePage": "CodeBuddy Usage: Open usage page",
+  "command.buddyClaim": "CodeBuddy Usage: Buddy claim credits",
+  "command.buddyDepart": "CodeBuddy Usage: Buddy depart",
+  "config.title": "CodeBuddy Usage",
+  "config.cookie": "Login Cookie copied from the workbuddy.cn website (stored locally only)",
+  "config.userAgent": "Browser User-Agent (stored locally only). Leave empty to use the built-in default Chrome/153. Must come from the same request as the Cookie, otherwise the server treats the session as mismatched and returns 401",
+  "config.refreshIntervalMinutes": "Auto refresh interval (minutes), 0 disables auto refresh",
+  "config.autoCheckin": "Enable automatic daily check-in to claim credits (when disabled, no check-in runs and the hover tooltip hides the check-in status)",
+  "config.apiBase": "API base URL (domestic .cn / international .ai)",
+  "config.buddyTravel": "Enable buddy travel (send your buddy on tasks to earn credits automatically). When enabled, each refresh claims and dispatches the buddy automatically; the tooltip shows the travel countdown / claim / depart actions, once per day"
+}

@@ -1,6 +1,21 @@
 # Change Log
 
+[English](./CHANGELOG.en.md) | 简体中文
+
 所有值得注意的变更都会记录在此文件。
+
+## [0.8.0]
+
+### 新增
+
+- **双语界面（英文 / 简体中文）**：界面语言跟随 VS Code 显示语言。
+  清单文案走 `package.nls.json` / `package.nls.zh-cn.json`，运行时文案走 `vscode.l10n.t()`
+  与 `l10n/bundle.l10n.zh-cn.json`；英文为内置默认语言，无需额外文件。
+- 英文文档：`README.en.md` 与 `CHANGELOG.en.md`。
+
+### 修复
+
+- 悬浮框里「总量」的跳转链接原先硬编码 `.cn`，现改为跟随 `apiBase` 配置。
 
 ## [0.7.0]
 
