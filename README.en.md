@@ -62,7 +62,7 @@ Once installed there is nothing to do — both of the following happen automatic
 
 On success a notification tells you how much you got. If there is nothing to claim, or you already claimed today, you will not be disturbed.
 
-Hovering the status bar shows today's status at the bottom, e.g. `✓ Checked in`, `✿ Travel countdown 03:12:45`.
+Hovering the status bar shows today's status at the bottom, e.g. `✓ Checked in`, `✿ Countdown 03:12:45`.
 
 ---
 

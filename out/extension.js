@@ -596,7 +596,7 @@ function buddyTag() {
         const mm = Math.floor((remain % 3600) / 60);
         const ss = remain % 60;
         const pad = (n) => String(n).padStart(2, "0");
-        return t("✿ Travel countdown {0}:{1}:{2}", pad(hh), pad(mm), pad(ss));
+        return t("✿ Countdown {0}:{1}:{2}", pad(hh), pad(mm), pad(ss));
     }
     // 今日喵喵任务已完成（达到每日领取/出发上限）：
     // 若本次刷新有领取结果则一并展示，避免「已到达但积分未领取」被误导为已完成
@@ -604,26 +604,26 @@ function buddyTag() {
         const c = b.claim;
         if (c && c.credit != null) {
             return c.credit > 0
-                ? t("✿ Done for today · {0} credits claimed", c.credit)
-                : t("✿ Done for today · no credits to claim");
+                ? t("✿ Done today · +{0}", c.credit)
+                : t("✿ Done today · no credits");
         }
         if (c && c.error) {
-            return t("✿ Done for today · claim failed ({0})", c.error);
+            return t("✿ Claim failed ({0})", c.error);
         }
-        return t("✿ Done for today, come back tomorrow");
+        return t("✿ Done today");
     }
     // 空闲/已到达：展示可点击的「领积分」「去旅行」，或操作结果
     const parts = [];
     if (b.claim && b.claim.credit != null) {
         parts.push(b.claim.credit > 0
-            ? t("{0} credits claimed", b.claim.credit)
-            : t("No credits to claim"));
+            ? t("{0} claimed", b.claim.credit)
+            : t("Nothing to claim"));
     }
     else {
         parts.push(t('[Claim](command:codebuddyUsage.buddyClaim "Claim credits earned by your buddy")'));
     }
     if (b.depart && b.depart.hours != null) {
-        parts.push(t("Travel time {0} hours", b.depart.hours));
+        parts.push(t("Travel {0}h", b.depart.hours));
     }
     else {
         parts.push(t('[Depart](command:codebuddyUsage.buddyDepart "Send your buddy on a task to earn credits")'));

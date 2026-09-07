@@ -630,7 +630,7 @@ function buddyTag(): string {
     const mm = Math.floor((remain % 3600) / 60);
     const ss = remain % 60;
     const pad = (n: number) => String(n).padStart(2, "0");
-    return t("✿ Travel countdown {0}:{1}:{2}", pad(hh), pad(mm), pad(ss));
+    return t("✿ Countdown {0}:{1}:{2}", pad(hh), pad(mm), pad(ss));
   }
 
   // 今日喵喵任务已完成（达到每日领取/出发上限）：
@@ -639,13 +639,13 @@ function buddyTag(): string {
     const c: any = b.claim;
     if (c && c.credit != null) {
       return c.credit > 0
-        ? t("✿ Done for today · {0} credits claimed", c.credit)
-        : t("✿ Done for today · no credits to claim");
+        ? t("✿ Done today · +{0}", c.credit)
+        : t("✿ Done today · no credits");
     }
     if (c && c.error) {
-      return t("✿ Done for today · claim failed ({0})", c.error);
+      return t("✿ Claim failed ({0})", c.error);
     }
-    return t("✿ Done for today, come back tomorrow");
+    return t("✿ Done today");
   }
 
   // 空闲/已到达：展示可点击的「领积分」「去旅行」，或操作结果
@@ -653,8 +653,8 @@ function buddyTag(): string {
   if (b.claim && (b.claim as any).credit != null) {
     parts.push(
       (b.claim as any).credit > 0
-        ? t("{0} credits claimed", (b.claim as any).credit)
-        : t("No credits to claim")
+        ? t("{0} claimed", (b.claim as any).credit)
+        : t("Nothing to claim")
     );
   } else {
     parts.push(
@@ -662,7 +662,7 @@ function buddyTag(): string {
     );
   }
   if (b.depart && (b.depart as any).hours != null) {
-    parts.push(t("Travel time {0} hours", (b.depart as any).hours));
+    parts.push(t("Travel {0}h", (b.depart as any).hours));
   } else {
     parts.push(
       t('[Depart](command:codebuddyUsage.buddyDepart "Send your buddy on a task to earn credits")')

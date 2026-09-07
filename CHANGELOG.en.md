@@ -13,6 +13,10 @@ All notable changes are documented in this file.
   with `l10n/bundle.l10n.zh-cn.json`. English is the built-in default and requires no extra file.
 - English documentation: `README.en.md` and this file.
 
+### Changed
+
+- Shortened the English hover tooltip tags (e.g. `✿ Done today`, `✿ Countdown 03:12:45`) so the combined status row stays compact.
+
 ### Fixed
 
 - The "total" link in the hover tooltip was hard-coded to the `.cn` site; it now follows the `apiBase` setting.

@@ -13,6 +13,10 @@
   与 `l10n/bundle.l10n.zh-cn.json`；英文为内置默认语言，无需额外文件。
 - 英文文档：`README.en.md` 与 `CHANGELOG.en.md`。
 
+### 变更
+
+- 精简英文悬浮框标签（如 `✿ Done today`、`✿ Countdown 03:12:45`），避免与签到标签同行时过长。
+
 ### 修复
 
 - 悬浮框里「总量」的跳转链接原先硬编码 `.cn`，现改为跟随 `apiBase` 配置。
