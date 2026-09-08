@@ -372,12 +372,32 @@ async function claimBuddy() {
         return { error: e?.message ?? String(e) };
     }
 }
+/** 从 status 数据解析旅行时长（小时）：优先 duration_hours，其次由到达/出发时间差推算 */
+function resolveTravelHours(st) {
+    if (!st)
+        return undefined;
+    if (st.durationHours != null && st.durationHours > 0)
+        return st.durationHours;
+    if (st.arriveAt != null && st.departAt != null && st.arriveAt > st.departAt) {
+        const h = (st.arriveAt - st.departAt) / 3600;
+        return h > 0 ? h : undefined;
+    }
+    return undefined;
+}
 /** 派出喵喵出任务；location_id 默认 1 */
 async function departBuddy(locationId = 1) {
     try {
         const json = await callBuddyApi("depart", "POST", JSON.stringify({ location_id: locationId }));
-        if (json?.code === 0)
-            return { hours: json?.data?.duration_hours ?? json?.data?.duration ?? 0 };
+        if (json?.code === 0) {
+            // depart 接口的响应并不总带时长字段（缺字段时旧代码 ?? 0 会误报“0 小时”），
+            // 解析不到时回查 status，以服务端登记的旅行时长为准，与网页展示保持一致
+            const d = json?.data ?? {};
+            let hours = d.duration_hours ?? d.duration;
+            if (hours == null) {
+                hours = resolveTravelHours(await fetchBuddyStatus());
+            }
+            return { hours: hours != null && hours > 0 ? hours : 0 };
+        }
         return { error: json?.msg ?? `HTTP_${json?.code ?? ""}` };
     }
     catch (e) {

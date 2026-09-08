@@ -4,6 +4,17 @@
 
 All notable changes are documented in this file.
 
+## [0.8.1]
+
+### Fixed
+
+- Fixed the buddy-depart notification wrongly reporting "travel time 0 hours": the successful
+  `depart` response does not always carry a `duration_hours` / `duration` field, and the old code
+  fell back to `0`, disagreeing with the real travel time shown on the website (e.g. 2 hours).
+  When the duration cannot be read from the `depart` response, the extension now re-queries the
+  `status` endpoint and uses the server-registered `duration_hours`, or falls back to deriving it
+  from the difference between `arrive_at` and `depart_at`, matching what the website displays.
+
 ## [0.8.0]
 
 ### Added
