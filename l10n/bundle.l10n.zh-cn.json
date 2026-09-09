@@ -28,6 +28,8 @@
   "CodeBuddy Usage: Buddy departed, travel time {0} hours": "CodeBuddy Usage: 喵喵已出发，旅行时长 {0} 小时",
   "CodeBuddy Usage: Buddy failed to depart ({0})": "CodeBuddy Usage: 喵喵出发失败（{0}）",
   "CodeBuddy Usage: Buddy claimed {0} credits": "CodeBuddy Usage: 喵喵已领取 {0} 积分",
+  "Buddy travel credits claimed": "喵喵旅行积分已领取",
+  "CodeBuddy Usage: Buddy travel credits claimed": "CodeBuddy Usage: 喵喵旅行积分已领取",
   "CodeBuddy Usage: Your buddy has no travel credits to claim right now": "CodeBuddy Usage: 喵喵当前没有可领取的旅行积分",
 
   "✿ `Unknown`": "✿ `未知`",

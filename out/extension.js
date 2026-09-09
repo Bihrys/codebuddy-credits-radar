@@ -50,8 +50,16 @@ let lastResult;
 let lastUpdatedAt;
 let lastCheckin;
 let lastBuddy;
-let lastBuddyAutoDate = ""; // 本地日期字符串，用于「一日一次」自动触发守卫
-let lastBuddyClaimDate = ""; // 本地日期字符串，用于「一日一次」自动领积分守卫（与出发守卫解耦）
+let lastBuddyAutoDate = ""; // 本地日期字符串，用于「一日一次」自动触发出发守卫
+/** 已处理过的旅行标识（depart_at）：同一趟旅行只尝试领取一次，避免重复调用 claim */
+let lastBuddyClaimKey = "";
+/** 领取失败警告的「一日一次」守卫（与出发守卫、领取守卫解耦） */
+let lastBuddyClaimErrorDate = "";
+/**
+ * 上次刷新时喵喵是否在旅行中。用于识别「旅行刚结束」这一状态迁移——
+ * 它不依赖任何响应字段，即使服务端在「已到达」时清空 depart_at / arrive_at 也不会漏领。
+ */
+let lastBuddyWasTraveling = false;
 /** 防止并发 update 互相覆盖导致状态栏反复闪动/丢失 */
 let updating = false;
 const DEFAULT_PACKAGE_CODES = [
@@ -353,12 +361,40 @@ async function fetchBuddyStatus() {
         return null;
     }
 }
-/** 领取喵喵挣的积分 */
+/**
+ * 查询旅行记录里的到账积分（reward_credit）。
+ *
+ * status 接口虽然也有 reward_credit 字段，但实测恒为 0，不能代表本次到账积分；
+ * 旅行记录接口（records）每条记录里的 reward_credit 才是真实值（如 8）。
+ * 给定 departAt 时优先按出发时间匹配本趟旅行，匹配不到则退回最新一条。
+ */
+async function fetchTravelRewardCredit(departAt) {
+    try {
+        const json = await callBuddyApi("records?page=1&page_size=20", "GET");
+        if (json?.code !== 0)
+            return undefined;
+        const records = json?.data?.records ?? [];
+        if (records.length === 0)
+            return undefined;
+        const hit = departAt != null ? records.find((r) => r.depart_at === departAt) : undefined;
+        const credit = (hit ?? records[0])?.reward_credit;
+        return typeof credit === "number" ? credit : undefined;
+    }
+    catch {
+        return undefined;
+    }
+}
+/**
+ * 领取喵喵挣的积分。
+ * claimed=true 表示服务端已确认本次领取（code=0）；此时 credit 可能因响应字段缺失
+ * 而拿不到数值（与 depart 的 duration_hours 是同一类坑），调用方需另行兜底，
+ * 不能把它当成「无可领取」而静默，否则会出现「积分到账了却没有任何提示」。
+ */
 async function claimBuddy() {
     try {
         const json = await callBuddyApi("claim", "POST", "{}");
         if (json?.code === 0)
-            return { credit: json?.data?.credit ?? 0 };
+            return { claimed: true, credit: json?.data?.credit };
         const msg = json?.msg ?? `HTTP_${json?.code ?? ""}`;
         // 服务端返回 no unclaimed travel 表示「当前没有可领取的旅行积分」，
         // 属于正常状态（如积分已被之前的流程领取过），不算失败
@@ -432,18 +468,41 @@ async function ensureBuddy() {
     // 修复：领积分与「出发」解耦。旅行结束后喵喵处于「已到达」状态，
     // 此时即使当日已达上限（dailyLimitReached=true，无法再出发），
     // 也必须尝试领取本次旅行挣到的积分，否则积分会一直滞留在服务端。
-    if (backFromTravel && lastBuddyClaimDate !== todayStr()) {
+    //
+    // 守卫改为「一趟旅行一次」而非「一日一次」：一日一次会让当天第二趟及之后的旅行
+    // 积分滞留在服务端，且因为根本没调用 claim 而完全没有提示。
+    // 同一趟旅行（depart_at 相同）只尝试一次即可——claim 对「无可领取」是幂等的。
+    const isTraveling = status.state === "traveling";
+    // 「旅行刚结束」的状态迁移是最可靠的触发信号，不依赖任何响应字段；
+    // 与旅行标识守卫取「或」，双重保险，确保一天内多趟旅行（如跨天旅行 +
+    // 当天新旅行）的积分都能被领取，不会因为日期守卫而整趟漏掉
+    const travelJustEnded = lastBuddyWasTraveling && !isTraveling;
+    const travelKey = String(status.departAt ?? status.arriveAt ?? status.state ?? "");
+    if (backFromTravel && (travelJustEnded || travelKey !== lastBuddyClaimKey)) {
         const c = await claimBuddy().catch((e) => ({ error: e?.message ?? String(e) }));
-        if (c.credit != null) {
-            buddy.claim = { credit: c.credit };
-            // 只有真正到账才标记提示；credit=0（当前无可领取的旅行）保持静默
-            if (c.credit > 0)
-                buddy.freshlyClaimed = true;
-        }
-        else if (c.error) {
+        if (c.error) {
             buddy.claim = { error: c.error };
+            // 失败不记录 travelKey，下轮刷新继续重试；但警告一天最多弹一次
+            if (lastBuddyClaimErrorDate !== todayStr()) {
+                buddy.freshlyClaimFailed = true;
+                lastBuddyClaimErrorDate = todayStr();
+            }
         }
-        lastBuddyClaimDate = todayStr();
+        else {
+            // 服务端已确认领取（claimed）：响应里的 credit 可能缺失或为占位 0，
+            // 此时用 status 登记的本次旅行奖励积分 reward_credit 兜底，
+            // 避免「积分到账了却当成无可领取而静默」
+            let credit = c.credit;
+            if (c.claimed && !(credit > 0)) {
+                // status 的 reward_credit 实测为 0 不可用，改从旅行记录接口取真实到账积分
+                credit = await fetchTravelRewardCredit(status.departAt);
+            }
+            buddy.claim = { credit: credit ?? 0 };
+            // 只要服务端确认领取成功就提示（数量未知时提示不带数量）
+            if (c.claimed)
+                buddy.freshlyClaimed = true;
+            lastBuddyClaimKey = travelKey;
+        }
     }
     const canDepart = backFromTravel && !status.dailyLimitReached;
     if (canDepart && lastBuddyAutoDate !== todayStr()) {
@@ -460,6 +519,8 @@ async function ensureBuddy() {
             buddy.status = st2;
         lastBuddyAutoDate = todayStr();
     }
+    // 用本次刷新结束时的最新状态记录，供下次刷新判断「旅行刚结束」
+    lastBuddyWasTraveling = (buddy.status?.state ?? status.state) === "traveling";
     return buddy;
 }
 // ============================================================
@@ -502,10 +563,15 @@ function notifyBuddyResult(buddy) {
     const claim = buddy.claim;
     const depart = buddy.depart;
     const parts = [];
-    if (buddy.freshlyClaimed && claim?.credit != null) {
-        parts.push(t("Claimed {0} credits", claim.credit));
+    if (buddy.freshlyClaimed) {
+        // 服务端确认领取成功即提示：有数量就带数量，数量未知时只提示已领取，
+        // 绝不因为响应里没给 credit 就静默
+        parts.push(claim?.credit > 0
+            ? t("Claimed {0} credits", claim.credit)
+            : t("Buddy travel credits claimed"));
     }
-    else if (claim?.error) {
+    else if (buddy.freshlyClaimFailed && claim?.error) {
+        // 失败警告受「一日一次」守卫限制，避免每 30 分钟刷新反复弹窗
         vscode.window.showWarningMessage(t("CodeBuddy Usage: Failed to claim buddy credits ({0})", claim.error));
     }
     if (buddy.freshlyDeparted && depart?.hours != null) {
@@ -791,9 +857,18 @@ async function buddyClaimCmd() {
             vscode.window.showWarningMessage(t("CodeBuddy Usage: Failed to claim buddy credits ({0})", c.error));
         }
         else {
-            lastBuddy.claim = { credit: c.credit ?? 0 };
-            if ((c.credit ?? 0) > 0) {
-                vscode.window.showInformationMessage(t("CodeBuddy Usage: Buddy claimed {0} credits", c.credit));
+            let credit = c.credit;
+            if (c.claimed && !((credit ?? 0) > 0)) {
+                // 服务端确认领取成功但响应没给数量：从旅行记录接口取真实到账积分
+                credit = await fetchTravelRewardCredit(lastBuddy?.status?.departAt);
+            }
+            lastBuddy.claim = { credit: credit ?? 0 };
+            if ((credit ?? 0) > 0) {
+                vscode.window.showInformationMessage(t("CodeBuddy Usage: Buddy claimed {0} credits", credit));
+            }
+            else if (c.claimed) {
+                // 已确认领取成功但拿不到数量：不能误报成「没有可领取」
+                vscode.window.showInformationMessage(t("CodeBuddy Usage: Buddy travel credits claimed"));
             }
             else {
                 // 手动点击也要有反馈，否则点了「领积分」没有任何回应
