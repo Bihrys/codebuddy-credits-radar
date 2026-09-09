@@ -4,6 +4,26 @@
 
 All notable changes are documented in this file.
 
+## [0.8.3]
+
+### Added
+
+- When the claim response omits the credit amount, the extension now falls back to the travel
+  records endpoint and reads `reward_credit` for that trip, so the notification shows the real
+  amount (e.g. "Claimed 8 credits"). The `reward_credit` field of the `status` endpoint is
+  always `0` in practice and cannot be used.
+
+### Fixed
+
+- Fixed a successful claim producing no notification at all: a missing or `0` `credit` in the
+  `claim` response was treated as "nothing to claim" and silently ignored. A server-confirmed
+  claim now always notifies; if the amount is unknown it notifies without an amount.
+- Fixed the "once per day" claim guard skipping the second trip of a day (e.g. an overnight trip
+  plus a new trip the same day, which means two claims in one day): claiming is now triggered
+  when either the trip identifier changes or the trip just ended.
+- Failed claims are still retried on the next refresh, but the failure warning pops up at most
+  once a day instead of on every 30-minute refresh.
+
 ## [0.8.2]
 
 ### Fixed
