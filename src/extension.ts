@@ -407,7 +407,7 @@ function resolveTravelHours(st?: BuddyStatus | null): number | undefined {
   if (st.durationHours != null && st.durationHours > 0) return st.durationHours;
   if (st.arriveAt != null && st.departAt != null && st.arriveAt > st.departAt) {
     const h = (st.arriveAt - st.departAt) / 3600;
-    return h > 0 ? h : undefined;
+    return h > 0 ? Math.round(h * 10) / 10 : undefined;
   }
   return undefined;
 }
@@ -417,12 +417,15 @@ async function departBuddy(locationId = 1): Promise<{ hours?: number; error?: st
   try {
     const json = await callBuddyApi("depart", "POST", JSON.stringify({ location_id: locationId }));
     if (json?.code === 0) {
-      // depart 接口的响应并不总带时长字段（缺字段时旧代码 ?? 0 会误报“0 小时”），
-      // 解析不到时回查 status，以服务端登记的旅行时长为准，与网页展示保持一致
-      const d = json?.data ?? {};
-      let hours: number | undefined = d.duration_hours ?? d.duration;
-      if (hours == null) {
-        hours = resolveTravelHours(await fetchBuddyStatus());
+      // 实测 depart 响应里的时长字段不可靠（可能缺失，也可能带占位值 0；
+      // `??` 不会跳过 0，导致此前 0.8.1 即使回查逻辑存在也拿不到真实时长）。
+      // 服务端真正登记的旅行时长在 status 接口的 duration_hours 里（与网页展示一致），
+      // 因此 depart 成功后一律回查 status：有效则采用；status 拿不到时才退回
+      // depart 响应里的正数字段，最后才兜底 0。
+      const departHours: unknown = json?.data?.duration_hours ?? json?.data?.duration;
+      let hours = resolveTravelHours(await fetchBuddyStatus());
+      if (hours == null && typeof departHours === "number" && departHours > 0) {
+        hours = departHours;
       }
       return { hours: hours != null && hours > 0 ? hours : 0 };
     }

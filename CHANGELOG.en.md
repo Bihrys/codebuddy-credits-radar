@@ -4,6 +4,17 @@
 
 All notable changes are documented in this file.
 
+## [0.8.2]
+
+### Fixed
+
+- Fixed the travel time still being reported as 0 hours: the 0.8.1 fallback only kicked in when
+  the `depart` response's duration field was `null` / `undefined`, while the server actually returns
+  a placeholder `0` (and `??` does not skip `0`), so the `status` lookup was never reached.
+  Now, after a successful `depart`, the duration always comes from the `status` endpoint's
+  `duration_hours` (matching what the website shows); the positive value from the `depart` response
+  is only used when `status` yields nothing.
+
 ## [0.8.1]
 
 ### Fixed
