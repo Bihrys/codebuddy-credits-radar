@@ -4,11 +4,11 @@
 
 所有值得注意的变更都会记录在此文件。
 
-## [0.9.1]
+## [0.9.2]
 
 ### 新增
 
-- **自动读取 CodeBuddy 登录态（accessToken 模式）**：本机装了 CodeBuddy 并登录后，
+- **自动读取 CodeBuddy 登录态（accessToken 模式）**：在 VS Code 中安装 CodeBuddy 扩展并登录后，
   扩展直接读取其登录态里的 `accessToken`（JWT），以 `Authorization: Bearer` 调用接口，
   不再需要 Cookie，也不受 Cookie 快速失效、与 UA 强绑定的困扰。
 - **token 持久化缓存（钥匙串只读一次）**：首次读到的 token 写入扩展自己的 SecretStorage
@@ -16,8 +16,11 @@
   钥匙串读取失败时本次会话不再重试，避免反复弹授权框。
 - 新增 `codebuddyUsage.accessToken` 配置与命令 **`CodeBuddy Usage: 输入 Access Token（自动读取失败时）`**，
   作为自动读取失败后的唯一手动兜底；留空提交表示清除并重新尝试自动读取。
-- 悬浮框底部新增鉴权状态标签（如 `✓ 自动 Token · 11-14`），并展示 token 到期日。
-- 读取 state.vscdb 优先使用 Node 内置 `node:sqlite`，不再强依赖系统 `sqlite3` 命令。
+- 悬浮框 `Remaining` 行右侧展示凭据有效期（如 `有效期至 11-14`），仅在读取失败时提示未登录。
+- **支持 Windows 自动读取**：从 `<userData>/Local State` 取 DPAPI 保护的密钥（经 PowerShell 调用 DPAPI），
+  再用 AES-256-GCM 解密登录态，全程无需手动交互。
+- 读取 state.vscdb 依次尝试 `node:sqlite` → 系统 `sqlite3` → **内置最小 SQLite 解析器**，
+  不再强依赖外部命令（Windows 上没有 `sqlite3`）。
 
 ### 变更
 
@@ -30,7 +33,7 @@
 
 - 解密本地登录态必须访问系统钥匙串（macOS），这是 macOS 的安全模型、无法绕过；
   通过「持久化缓存 + 失败即停」把访问频率降到约 60 天一次。首次弹窗点「始终允许」即可。
-- 自动读取目前仅支持 macOS；Windows / Linux 请手动输入 `accessToken`。
+- 自动读取支持 macOS（钥匙串）与 Windows（DPAPI）；Linux 的 safeStorage 走 keyring，暂未适配，请手动输入 `accessToken`。
 - 扩展**不调用 refreshToken**：CodeBuddy 自己会刷新并写回最新 token，扩展每次重读即可，
   避免两边互相轮换把登录态挤掉。
 

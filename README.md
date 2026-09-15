@@ -9,10 +9,13 @@
 ## 开箱即用
 
 1. 安装本扩展（扩展市场搜 `CodeBuddy Usage`，或安装 `.vsix` 文件）
-2. 确保本机**已经安装并登录了 CodeBuddy 扩展**（腾讯云 CodeBuddy / coding-copilot）
+2. 在 VS Code 里安装扩展 **Tencent Cloud CodeBuddy**（`tencent-cloud.coding-copilot`）并登录
 
-就这样。本扩展会自动读取 CodeBuddy 的登录态（`accessToken`）来调用接口，
-**不需要再手动复制 Cookie**。CodeBuddy 自己会刷新登录态，所以这里读到的始终是最新的。
+> 只需要这个 **VS Code 扩展**，**不需要**安装 WorkBuddy / CodeBuddy 桌面端或其它客户端——
+> 登录态由该扩展保存在 VS Code 自己的凭据库里，本扩展直接读取。
+
+就这样。本扩展会自动读取该扩展保存的登录态（`accessToken`）来调用接口，
+**不需要再手动复制 Cookie**。CodeBuddy 扩展自己会刷新登录态，所以这里读到的始终是最新的。
 
 > **关于域名**：腾讯的「CodeBuddy」和「WorkBuddy」是同一套账号和后台，
 > 登录其中任意一个官网即可，不需要单独注册。
@@ -22,19 +25,21 @@
 
 ![状态栏与悬浮框](https://raw.githubusercontent.com/wwenc6621/CodeBuddy-Usage/main/resources/docs/tooltip-preview.png)
 
-### 关于钥匙串授权（只会弹一次）
+### 凭据访问授权（只会请求一次）
 
-`accessToken` 在本地是加密存放的（VS Code 的 SecretStorage），解密密钥在系统钥匙串里，
-所以**首次**读取时 macOS 会弹一次授权框（可能需要输入开机密码），**点「始终允许」**即可。
+`accessToken` 在本地是加密存放的（VS Code 的 SecretStorage），解密密钥在系统凭据存储里：
+
+- **macOS**：钥匙串。首次读取会弹一次授权框（可能需要输入开机密码），点「始终允许」即可；
+- **Windows**：DPAPI（当前用户范围），直接解密，无需任何交互。
 
 读完这一次后，扩展会把 token 缓存进自己的 SecretStorage（读写它不需要任何授权），
-**此后直到 token 临近过期（约 60 天）都不会再访问钥匙串**。
-如果某次读取失败，扩展**不会反复弹窗**，而是转为提示你手动粘贴一次 token。
+**此后直到 token 临近过期（约 60 天）都不会再访问系统凭据**。
+如果某次读取失败，扩展**不会反复请求**，而是转为提示你手动粘贴一次 token。
 
 ### 自动读取失败时：手动粘贴 Access Token
 
-以下情况需要手动兜底：本机没装 CodeBuddy、非 macOS 系统（自动读取暂只支持 macOS）、
-或钥匙串授权被拒 / 不可用。
+以下情况需要手动兜底：本机没装 CodeBuddy、**Linux 系统（自动读取暂未适配）**、
+或系统凭据不可用 / 授权被拒。
 
 `Cmd/Ctrl + Shift + P` → **`CodeBuddy Usage: 输入 Access Token（自动读取失败时）`** → 粘贴 JWT。
 有效期约 60 天；输入框留空提交表示清除手动值，并重新尝试自动读取。
@@ -69,11 +74,11 @@
 
 | 现象                         | 怎么办                                                                 |
 | ---------------------------- | ---------------------------------------------------------------------- |
-| 状态栏显示「未找到登录凭据」 | 确认 CodeBuddy 已登录；仍不行就手动设置 Access Token                    |
-| 显示「登录已过期」           | CodeBuddy 登录态失效，重新登录一次；或手动设置 Access Token             |
+| 状态栏显示「未找到登录凭据」 | 确认 VS Code 里的 CodeBuddy 扩展已登录；仍不行就手动粘贴 Access Token   |
+| 显示「登录已过期」           | CodeBuddy 扩展登录失效，在 VS Code 里重新登录；或手动粘贴 Access Token  |
 | 显示「拉取失败」             | 点状态栏重试一次                                                       |
 | 数字一直不变                 | 点一下状态栏手动刷新                                                   |
-| 提示要钥匙串授权             | 首次弹窗里点「始终允许」，之后不会再弹；仍不行就手动粘贴 Access Token    |
+| 提示要授权（macOS 钥匙串）   | 首次弹窗里点「始终允许」，之后不会再弹；仍不行就手动粘贴 Access Token    |
 | 用的是国际站                 | 设置里把 `apiBase` 改成 `https://www.workbuddy.ai`                      |
 
 ---
@@ -93,8 +98,8 @@
 
 ## 安全
 
-- 扩展只在本机读取 CodeBuddy 登录态（`accessToken`），凭据**不会上传到任何地方**，也不经过第三方。
-- 解密本地登录态需要访问系统钥匙串（macOS）：仅首次（或 token 临近过期时）读取，点一次「始终允许」后长期无感。
+- 扩展只在本机读取 CodeBuddy 扩展（VS Code 内）保存的登录态（`accessToken`），凭据**不会上传到任何地方**，也不经过第三方。
+- 解密本地登录态需要访问系统凭据存储（macOS 钥匙串 / Windows DPAPI）：仅首次（或 token 临近过期时）读取一次，之后长期无感。
 - 读到的 token 会缓存进**扩展自己的 SecretStorage**（由 VS Code 加解密，同样只在本机）。
 - 手动填写的 `accessToken` **只存在你本机的 VS Code 配置里**。
 - 别把这些凭据发给别人。退出登录后它们立刻失效。

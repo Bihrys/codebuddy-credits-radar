@@ -4,6 +4,7 @@ import * as crypto from "crypto";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+import { readValueByKeyMatch } from "./sqlite-reader";
 
 const execFileAsync = promisify(execFile);
 
@@ -11,19 +12,20 @@ const execFileAsync = promisify(execFile);
  * CodeBuddy 登录态读取（accessToken 模式）
  * ============================================================
  * 目标：从本机 CodeBuddy 登录态里拿到 `accessToken`（JWT），以 `Authorization: Bearer`
- * 调用 workbuddy.cn 接口，彻底摆脱 Cookie（短命 + 与服务端 UA 强绑定）。
+ * 调用 workbuddy.cn 接口，彻底摆脱 Cookie。
  *
- * 为什么需要钥匙串：CodeBuddy 把会话加密存在 VS Code 的 SecretStorage 里
- * （macOS 上是 state.vscdb 的密文，`v10` 前缀），解密密钥只存在于系统钥匙串条目
- * （`Code Safe Storage` / `Code Key`）。任何非 VS Code 自身进程读取该条目
- * 都会触发一次系统授权 —— 这是 macOS 的安全模型，无法绕过。
- *
- * 因此这里把钥匙串访问压到最低频率：
+ * 本地登录态是 VS Code 的 SecretStorage（state.vscdb 里的密文），由 Electron safeStorage
+ * 加密，各平台机制不同：
+ *  - macOS：密钥在 Keychain（`<Product> Safe Storage` / `<Product> Key`），
+ *           派生 PBKDF2(password, "saltysalt", 1003)，密文 `v10` + AES-128-CBC；
+ *  - Windows：密钥在 `<userData>/Local State` 的 `os_crypt.encrypted_key`（DPAPI 保护），
+ *           密文 `v10` + AES-256-GCM（12B nonce + 16B tag）。
+ * 解密本地登录态必须访问系统凭据存储（macOS 钥匙串 / Windows DPAPI），这是系统安全模型，
+ * 无法绕过；因此这里把访问压到最低频率：
  *  1. 先看「持久化缓存」（宿主注入的 TokenStore，通常是扩展自己的 SecretStorage，
- *     读写它不触发任何授权）：token 未过期且剩余有效期充足 → 直接用，完全不碰钥匙串；
- *  2. 缓存不可用或临近过期 → 读钥匙串解密一次，成功后写回持久化缓存（约 60 天一次）；
- *  3. 钥匙串读取失败（授权被拒 / 环境缺失）→ 本次会话不再重试，避免反复弹窗，
- *     交由「手动输入的 accessToken」兜底；都没有则提示用户输入。
+ *     读写不触发任何授权）：token 未过期且剩余有效期充足 → 直接用；
+ *  2. 缓存不可用或临近过期 → 读取登录态解密一次，成功后写回持久化缓存（约 60 天一次）；
+ *  3. 读取失败 → 本次会话不再重试，避免反复干扰，交由「手动输入的 accessToken」兜底。
  *
  * 注意：绝不主动调用 refreshToken —— 那会与 CodeBuddy 自身的刷新互相轮换，
  * 反而把 IDE 的登录态挤掉。token 由 CodeBuddy 负责刷新，我们只在需要时重读。
@@ -35,7 +37,7 @@ const SECRET_KEY = "Tencent-Cloud.coding-copilot.new.accessToken";
 const ENC_PREFIX = "v10";
 /** 内存缓存时长，避免同一轮刷新内重复读取 */
 const CACHE_TTL_MS = 5 * 60 * 1000;
-/** 持久化缓存的 token 剩余有效期低于该值时，才重新去读钥匙串（CodeBuddy 可能已刷新） */
+/** 持久化缓存的 token 剩余有效期低于该值时，才重新去读系统凭据（CodeBuddy 可能已刷新） */
 const REFRESH_MARGIN_MS = 24 * 60 * 60 * 1000;
 
 export type AuthMode = "token-auto" | "token-manual" | "none";
@@ -61,71 +63,102 @@ export interface TokenStore {
   set(value: { token: string; expiresAt?: number } | undefined): Promise<void>;
 }
 
-/** 各宿主（VS Code 及其衍生 IDE）的 state.vscdb 路径与钥匙串条目 */
+/** 各宿主（VS Code 及其衍生 IDE）的登录态位置与密钥来源 */
 interface HostCandidate {
   label: string;
+  /** state.vscdb 路径 */
   dbPath: string;
-  keychainService: string;
-  keychainAccount: string;
+  /** macOS：钥匙串条目 */
+  keychainService?: string;
+  keychainAccount?: string;
+  /** Windows：Electron 的 Local State 文件（内含 DPAPI 保护的密钥） */
+  localStatePath?: string;
 }
 
-/**
- * 目前仅 macOS 支持自动读取：Windows（DPAPI）与 Linux（libsecret/gnome-keyring）
- * 的 safeStorage 机制不同，待后续适配；这些平台直接走「手动 accessToken」。
- */
+const PRODUCT_NAMES = [
+  "Code",
+  "Code - Insiders",
+  "CodeBuddy",
+  "CodeBuddy CN",
+  "Trae",
+  "Trae CN",
+  "Cursor",
+  "Kiro",
+  "Qoder",
+];
+
 function hostCandidates(): HostCandidate[] {
-  if (process.platform !== "darwin") return [];
-  const base = path.join(os.homedir(), "Library/Application Support");
-  const rows: Array<[string, string, string]> = [
-    ["Code", "Code Safe Storage", "Code Key"],
-    ["Code - Insiders", "Code - Insiders Safe Storage", "Code - Insiders Key"],
-    ["CodeBuddy", "CodeBuddy CN Safe Storage", "CodeBuddy CN Key"],
-    ["CodeBuddy CN", "CodeBuddy CN Safe Storage", "CodeBuddy CN Key"],
-    ["Trae", "Trae Safe Storage", "Trae Key"],
-    ["Trae CN", "Trae CN Safe Storage", "Trae CN Key"],
-    ["Cursor", "Cursor Safe Storage", "Cursor Key"],
-    ["Kiro", "Kiro Safe Storage", "Kiro Key"],
-    ["Qoder", "Qoder Safe Storage", "Qoder Key"],
-  ];
-  return rows.map(([app, svc, acct]) => ({
-    label: app,
-    dbPath: path.join(base, app, "User/globalStorage/state.vscdb"),
-    keychainService: svc,
-    keychainAccount: acct,
-  }));
+  if (process.platform === "darwin") {
+    const base = path.join(os.homedir(), "Library/Application Support");
+    return PRODUCT_NAMES.map((app) => ({
+      label: app,
+      dbPath: path.join(base, app, "User/globalStorage/state.vscdb"),
+      keychainService: `${app} Safe Storage`,
+      keychainAccount: `${app} Key`,
+    }));
+  }
+  if (process.platform === "win32") {
+    // Windows 上登录态与密钥都在 %APPDATA%\<Product> 下
+    const appData = process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming");
+    return PRODUCT_NAMES.map((app) => ({
+      label: app,
+      dbPath: path.join(appData, app, "User", "globalStorage", "state.vscdb"),
+      localStatePath: path.join(appData, app, "Local State"),
+    }));
+  }
+  // Linux 的 safeStorage 走 keyring（libsecret / kwallet），尚未适配，先走手动 accessToken
+  return [];
 }
 
-/**
- * 查询 sqlite 中的单个值。
- * 优先用 Node 内置 `node:sqlite`（Node 22.5+ / Electron 37+ 自带，无需外部命令，
- * 对 Windows 尤其重要），不可用时回退系统 `sqlite3` 命令（macOS / 多数 Linux 自带）。
- */
-async function querySqliteValue(dbPath: string, sql: string): Promise<string> {
+/** 用 Node 内置 node:sqlite 读取（Node 22.5+；部分宿主未启用则抛错） */
+function readValueViaNodeSqlite(dbPath: string, sql: string): string | undefined {
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const mod: any = require("node:sqlite");
     const db = new mod.DatabaseSync(dbPath, { readOnly: true });
     try {
       const row = db.prepare(sql).get();
-      return row?.value != null ? String(row.value) : "";
+      return row?.value != null ? String(row.value) : undefined;
     } finally {
       db.close?.();
     }
   } catch {
-    // 继续走外部命令回退
+    return undefined;
   }
-  const { stdout } = await execFileAsync("sqlite3", [dbPath, sql], {
-    maxBuffer: 64 * 1024 * 1024,
-    timeout: 30_000,
-  });
-  return String(stdout);
 }
 
-/** 从 state.vscdb 读取加密后的 secret（Buffer） */
-async function readEncryptedSecret(dbPath: string): Promise<Buffer | undefined> {
+/** 用系统 sqlite3 命令读取（macOS / 多数 Linux 自带；Windows 通常没有） */
+async function readValueViaCli(dbPath: string, sql: string): Promise<string | undefined> {
+  try {
+    const { stdout } = await execFileAsync("sqlite3", [dbPath, sql], {
+      maxBuffer: 64 * 1024 * 1024,
+      timeout: 30_000,
+    });
+    const raw = String(stdout).trim();
+    return raw || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const SECRET_SQL = `select value from ItemTable where key like '%${SECRET_KEY}"}%'`;
+
+/**
+ * 依次尝试三种方式读取 state.vscdb 中的密文原文：
+ * 官方 node:sqlite → 系统 sqlite3 命令 → 内置最小解析器（Windows 上通常走这条）。
+ */
+async function readSecretRaw(dbPath: string): Promise<string | undefined> {
   if (!fs.existsSync(dbPath)) return undefined;
-  const sql = `select value from ItemTable where key like '%${SECRET_KEY}"}%'`;
-  const raw = (await querySqliteValue(dbPath, sql)).trim();
+  const viaNode = readValueViaNodeSqlite(dbPath, SECRET_SQL);
+  if (viaNode) return viaNode;
+  const viaCli = await readValueViaCli(dbPath, SECRET_SQL);
+  if (viaCli) return viaCli;
+  return readValueByKeyMatch(dbPath, (key) => key.includes(SECRET_KEY));
+}
+
+/** 读取加密后的 secret（Buffer） */
+async function readEncryptedSecret(dbPath: string): Promise<Buffer | undefined> {
+  const raw = (await readSecretRaw(dbPath))?.trim();
   if (!raw) return undefined;
   try {
     const parsed = JSON.parse(raw);
@@ -136,8 +169,8 @@ async function readEncryptedSecret(dbPath: string): Promise<Buffer | undefined> 
   return undefined;
 }
 
-/** 从钥匙串取 safeStorage 密钥并派生 AES key；不可用/被拒时返回 undefined */
-async function readSafeStorageKey(service: string, account: string): Promise<Buffer | undefined> {
+/** macOS：从钥匙串取 safeStorage 密钥并派生 AES key；不可用/被拒时返回 undefined */
+async function readMacKey(service: string, account: string): Promise<Buffer | undefined> {
   try {
     const { stdout } = await execFileAsync(
       "security",
@@ -150,23 +183,81 @@ async function readSafeStorageKey(service: string, account: string): Promise<Buf
     // 实测：safeStorage 的 AES key = PBKDF2(钥匙串密码, "saltysalt", 1003, SHA1, 16)
     return crypto.pbkdf2Sync(password, "saltysalt", 1003, 16, "sha1");
   } catch {
-    // security 不存在 / 用户拒绝授权 / 钥匙串锁定，统一按「钥匙串不可用」处理
     return undefined;
   }
 }
 
-/** 解密 safeStorage 密文（v10 = AES-128-CBC，IV 取密文前 16 字节） */
-function decryptV10(enc: Buffer, key: Buffer): string | undefined {
-  if (enc.length <= 3 + 16) return undefined;
-  if (enc.subarray(0, 3).toString() !== ENC_PREFIX) return undefined;
+/** PowerShell 可执行文件路径（优先系统目录，避免 PATH 缺失） */
+function powershellPath(): string {
+  const root = process.env.SystemRoot ?? "C:\\Windows";
+  const full = path.join(root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+  return fs.existsSync(full) ? full : "powershell.exe";
+}
+
+/**
+ * Windows：读取 `<userData>/Local State` 里的 `os_crypt.encrypted_key`，
+ * 用 DPAPI（CurrentUser）解出 32 字节 AES 密钥。
+ * 通过 PowerShell 调 `ProtectedData.Unprotect` 完成，无需原生模块。
+ */
+async function readWindowsKey(localStatePath: string): Promise<Buffer | undefined> {
   try {
-    const iv = enc.subarray(3, 19);
-    const ciphertext = enc.subarray(19);
-    const decipher = crypto.createDecipheriv("aes-128-cbc", key, iv);
-    return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8");
+    if (!fs.existsSync(localStatePath)) return undefined;
+    const state = JSON.parse(fs.readFileSync(localStatePath, "utf8"));
+    const b64 = state?.os_crypt?.encrypted_key;
+    if (typeof b64 !== "string" || !b64) return undefined;
+    const raw = Buffer.from(b64, "base64");
+    const prefix = Buffer.from("DPAPI", "ascii");
+    const protectedKey = raw.subarray(0, 5).equals(prefix) ? raw.subarray(5) : raw;
+
+    // 用 -EncodedCommand（UTF-16LE + base64）传脚本，彻底规避引号转义问题
+    const script = [
+      "$ErrorActionPreference='Stop'",
+      `$b=[Convert]::FromBase64String('${protectedKey.toString("base64")}')`,
+      "$k=[System.Security.Cryptography.ProtectedData]::Unprotect($b,$null,[System.Security.Cryptography.DataProtectionScope]::CurrentUser)",
+      "[Console]::Out.Write([Convert]::ToBase64String($k))",
+    ].join(";");
+    const encoded = Buffer.from(script, "utf16le").toString("base64");
+    const { stdout } = await execFileAsync(
+      powershellPath(),
+      ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
+      { timeout: 60_000 }
+    );
+    const key = Buffer.from(String(stdout).trim(), "base64");
+    return key.length ? key : undefined;
   } catch {
     return undefined;
   }
+}
+
+/** macOS：v10 = AES-128-CBC，IV 取密文前 16 字节 */
+function decryptV10Cbc(enc: Buffer, key: Buffer): string | undefined {
+  if (enc.length <= 3 + 16) return undefined;
+  try {
+    const decipher = crypto.createDecipheriv("aes-128-cbc", key, enc.subarray(3, 19));
+    return Buffer.concat([decipher.update(enc.subarray(19)), decipher.final()]).toString("utf8");
+  } catch {
+    return undefined;
+  }
+}
+
+/** Windows：v10 = AES-256-GCM（12 字节 nonce 在前，16 字节 tag 在尾部） */
+function decryptV10Gcm(enc: Buffer, key: Buffer): string | undefined {
+  if (enc.length <= 3 + 12 + 16) return undefined;
+  try {
+    const nonce = enc.subarray(3, 15);
+    const tag = enc.subarray(enc.length - 16);
+    const data = enc.subarray(15, enc.length - 16);
+    const decipher = crypto.createDecipheriv("aes-256-gcm", key, nonce);
+    decipher.setAuthTag(tag);
+    return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
+  } catch {
+    return undefined;
+  }
+}
+
+function decryptSecret(enc: Buffer, key: Buffer): string | undefined {
+  if (enc.subarray(0, 3).toString() !== ENC_PREFIX) return undefined;
+  return process.platform === "win32" ? decryptV10Gcm(enc, key) : decryptV10Cbc(enc, key);
 }
 
 /**
@@ -193,7 +284,7 @@ export function jwtExpiry(token: string): number | undefined {
 }
 
 /** 自动读取 CodeBuddy 登录态里的 accessToken */
-async function readAutoToken(): Promise<{ token?: string; note?: string; denied?: boolean }> {
+async function readAutoToken(): Promise<{ token?: string; note?: string }> {
   const hosts = hostCandidates();
   if (hosts.length === 0) {
     return { note: "auto-read unsupported on this platform" };
@@ -205,20 +296,19 @@ async function readAutoToken(): Promise<{ token?: string; note?: string; denied?
       const enc = await readEncryptedSecret(host.dbPath);
       if (!enc) continue;
       sawDb = true;
-      const key = await readSafeStorageKey(host.keychainService, host.keychainAccount);
-      if (!key) return { note: "keychain access denied", denied: true };
-      const plain = decryptV10(enc, key);
+      const key =
+        process.platform === "win32"
+          ? await readWindowsKey(host.localStatePath ?? "")
+          : await readMacKey(host.keychainService ?? "", host.keychainAccount ?? "");
+      // 凭据存储不可用（钥匙串被拒 / DPAPI 失败）：不再尝试其它宿主，避免连环干扰
+      if (!key) return { note: "credential store unavailable" };
+      const plain = decryptSecret(enc, key);
       if (!plain) continue;
       sawEncrypted = true;
       const token = extractAccessToken(plain);
       if (token) return { token };
-    } catch (e: any) {
-      const msg = String(e?.message ?? e);
-      // security 命令被拒绝 / 超时：视为授权失败，不再重试其它宿主（避免连环弹窗）
-      if (/denied|User interaction is not allowed|canceled|cancelled|-128/i.test(msg)) {
-        return { note: "keychain access denied", denied: true };
-      }
-      // 其它错误（例如 Windows 无 sqlite3）继续尝试下一个宿主
+    } catch {
+      // 单个宿主失败不影响其它候选
     }
   }
   if (!sawDb) return { note: "no CodeBuddy session found" };
@@ -229,31 +319,36 @@ async function readAutoToken(): Promise<{ token?: string; note?: string; denied?
 let cache: AuthState | undefined;
 let cacheAt = 0;
 let storeRef: TokenStore | undefined;
-/** 自动读取失败后置位：本次会话不再尝试钥匙串，避免反复弹授权窗 */
+/** 自动读取失败后置位：本次会话不再尝试系统凭据，避免反复弹授权窗 */
 let autoReadBlocked = false;
 let lastAutoNote: string | undefined;
 
 /**
  * 清空鉴权缓存。
- * @param allowKeychainRetry 是否允许下次再尝试读取钥匙串（默认否：失败过就不再打扰用户）
+ * @param allowCredentialRetry 是否允许下次再尝试读取系统凭据（默认否：失败过就不再打扰用户）
  */
-export function invalidateAuth(allowKeychainRetry = false): void {
+export function invalidateAuth(allowCredentialRetry = false): void {
   cache = undefined;
   cacheAt = 0;
-  if (allowKeychainRetry) autoReadBlocked = false;
+  if (allowCredentialRetry) autoReadBlocked = false;
   // 丢弃持久化缓存，强制重新判断（401 时旧 token 已不可信）
   if (storeRef) void storeRef.set(undefined).catch(() => undefined);
 }
 
-/** 用户手动输入 token 后调用：解除钥匙串封锁，允许下次重新尝试自动读取 */
+/** 用户手动输入 token 后调用：解除封锁，允许下次重新尝试自动读取 */
 export function resetAutoReadBlock(): void {
   autoReadBlocked = false;
   lastAutoNote = undefined;
 }
 
+/** 注册持久化缓存实现（在 activate 时注入扩展的 SecretStorage） */
+export function useTokenStore(store: TokenStore | undefined): void {
+  storeRef = store;
+}
+
 /**
  * 获取当前生效的鉴权状态（带内存缓存）。
- * 优先级：持久化缓存（未临近过期）→ 钥匙串自动读取 → 手动输入 token。
+ * 优先级：持久化缓存（未临近过期）→ 自动读取系统登录态 → 手动输入 token。
  */
 export async function getAuth(cfg: AuthConfig): Promise<AuthState> {
   const now = Date.now();
@@ -261,7 +356,7 @@ export async function getAuth(cfg: AuthConfig): Promise<AuthState> {
 
   const manualToken = (cfg.manualToken ?? "").trim();
 
-  // 1. 持久化缓存：未临近过期就直接用，完全不需要访问钥匙串
+  // 1. 持久化缓存：未临近过期就直接用，完全不需要访问系统凭据
   if (storeRef) {
     const cached = await storeRef.get().catch(() => undefined);
     if (cached?.token) {
@@ -274,7 +369,7 @@ export async function getAuth(cfg: AuthConfig): Promise<AuthState> {
     }
   }
 
-  // 2. 钥匙串自动读取（失败过一次后本会话跳过）
+  // 2. 自动读取（失败过一次后本会话跳过）
   if (!autoReadBlocked) {
     const auto = await readAutoToken();
     if (auto.token) {
@@ -308,11 +403,6 @@ export async function getAuth(cfg: AuthConfig): Promise<AuthState> {
   cache = { mode: "none", note: lastAutoNote };
   cacheAt = now;
   return cache;
-}
-
-/** 注册持久化缓存实现（在 activate 时注入扩展的 SecretStorage） */
-export function useTokenStore(store: TokenStore | undefined): void {
-  storeRef = store;
 }
 
 /** 由鉴权状态生成请求头 */

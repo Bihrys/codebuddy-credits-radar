@@ -6,7 +6,7 @@
   "command.buddyClaim": "CodeBuddy Usage: Buddy claim credits",
   "command.buddyDepart": "CodeBuddy Usage: Buddy depart",
   "config.title": "CodeBuddy Usage",
-  "config.accessToken": "Manual Access Token (JWT). Normally NOT needed — the extension reads CodeBuddy's sign-in state automatically. Fill it only when auto-read fails (CodeBuddy not installed, non-macOS, or keychain access denied). Stored locally only",
+  "config.accessToken": "Manual Access Token (JWT). Normally NOT needed — the extension reads the CodeBuddy extension's sign-in state automatically (macOS / Windows). Fill it only when auto-read fails (CodeBuddy extension not installed, Linux, or the credential store is unavailable). Stored locally only",
   "config.userAgent": "Browser User-Agent (stored locally only). Leave empty to use the built-in default",
   "config.refreshIntervalMinutes": "Auto refresh interval (minutes), 0 disables auto refresh",
   "config.autoCheckin": "Enable automatic daily check-in to claim credits (when disabled, no check-in runs and the hover tooltip hides the check-in status)",

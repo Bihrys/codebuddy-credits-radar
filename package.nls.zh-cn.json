@@ -6,7 +6,7 @@
   "command.buddyClaim": "CodeBuddy Usage: 喵喵领积分",
   "command.buddyDepart": "CodeBuddy Usage: 喵喵去旅行",
   "config.title": "CodeBuddy Usage",
-  "config.accessToken": "手动输入的 Access Token（JWT）。通常无需设置：扩展会自动读取 CodeBuddy 登录态。仅在自动读取失败时填写（未安装 CodeBuddy、非 macOS、或钥匙串授权被拒）。仅存于本地",
+  "config.accessToken": "手动输入的 Access Token（JWT）。通常无需设置：扩展会自动读取 CodeBuddy 扩展的登录态（支持 macOS / Windows）。仅在自动读取失败时填写（未安装 CodeBuddy 扩展、Linux 系统、或系统凭据不可用）。仅存于本地",
   "config.userAgent": "浏览器 User-Agent（仅存于本地）。留空使用内置默认值",
   "config.refreshIntervalMinutes": "自动刷新间隔（分钟），0 表示不自动刷新",
   "config.autoCheckin": "启用自动每日签到领取积分（关闭后不执行签到，悬浮框不显示签到状态）",

@@ -5,15 +5,15 @@
   "Error: {0}\nClick to retry": "错误: {0}\n点击重试",
 
   "No credentials found": "未找到登录凭据",
-  "Sign in to CodeBuddy, or set an Access Token manually": "请先登录 CodeBuddy，或手动设置 Access Token",
+  "Sign in to the CodeBuddy extension (VS Code), or set an Access Token manually": "请在 VS Code 中登录 CodeBuddy 扩展，或手动设置 Access Token",
   "Login expired": "登录已过期",
-  "CodeBuddy login expired — sign in again, or set an Access Token manually": "CodeBuddy 登录已过期 — 请重新登录，或手动设置 Access Token",
+  "The CodeBuddy extension sign-in expired — sign in again, or set an Access Token manually": "CodeBuddy 扩展登录已过期 — 请在 VS Code 中重新登录，或手动设置 Access Token",
 
-  "Until `{0}`": "有效期至 `{0}`",
+  "_Until `{0}`_": "_有效期至 `{0}`_",
   "`⚠ Not signed in`": "`⚠ 未登录`",
 
   "Access Token": "Access Token",
-  "Paste the CodeBuddy accessToken (JWT). Normally the extension reads it automatically — fill this only when auto-read failed.": "粘贴 CodeBuddy 的 accessToken（JWT）。正常情况下扩展会自动读取，仅当自动读取失败时才需要填写。",
+  "Paste the Access Token of the CodeBuddy extension (JWT). It is read automatically when possible — fill this only when auto-read failed.": "粘贴 CodeBuddy 扩展的 Access Token（JWT）。正常情况下扩展会自动读取，仅当自动读取失败时才需要填写。",
   "CodeBuddy Usage: Access Token saved": "CodeBuddy Usage: Access Token 已保存",
   "CodeBuddy Usage: Access Token cleared, retrying auto-read": "CodeBuddy Usage: Access Token 已清除，将重新尝试自动读取",
 

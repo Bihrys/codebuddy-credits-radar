@@ -668,7 +668,8 @@ async function update() {
             const note = lastAuth?.note;
             statusBarItem.text = `${icon("key")} ${t("No credentials found")}`;
             statusBarItem.tooltip =
-                t("Sign in to CodeBuddy, or set an Access Token manually") + (note ? `\n\n${note}` : "");
+                t("Sign in to the CodeBuddy extension (VS Code), or set an Access Token manually") +
+                    (note ? `\n\n${note}` : "");
             statusBarItem.command = "codebuddyUsage.setAccessToken";
             statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
             statusBarItem.show();
@@ -677,7 +678,7 @@ async function update() {
             const note = lastAuth?.note;
             statusBarItem.text = `${icon("error")} ${t("Login expired")}`;
             statusBarItem.tooltip =
-                t("CodeBuddy login expired — sign in again, or set an Access Token manually") +
+                t("The CodeBuddy extension sign-in expired — sign in again, or set an Access Token manually") +
                     (note ? `\n\n${note}` : "");
             statusBarItem.command = "codebuddyUsage.setAccessToken";
             statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
@@ -709,8 +710,8 @@ function authTag() {
             return "";
         const d = new Date(a.expiresAt);
         const p = (n) => String(n).padStart(2, "0");
-        // 只给日期加行内代码样式，文案尽量短
-        return t("Until `{0}`", `${p(d.getMonth() + 1)}-${p(d.getDate())}`);
+        // 与「仅显示前 5 条」提示保持一致：整句斜体，只给日期加行内代码样式
+        return t("_Until `{0}`_", `${p(d.getMonth() + 1)}-${p(d.getDate())}`);
     }
     return t("`⚠ Not signed in`");
 }
@@ -800,18 +801,14 @@ function buildTooltip(res, updatedAt) {
     lines.push(t("### CodeBuddy Credits"));
     lines.push(``);
     const remainLine = t("Remaining: `{0}` / [{1}]({2}) ({3}%)", totalRemain, totalSize, plansUrl, pct.toFixed(1));
+    const hint = visible.length > 5 ? t("_{0} packages, showing the first 5_", visible.length) : "";
     const auth = authTag();
-    if (auth) {
-        // 鉴权标签要贴在这一行的最右侧，而 Markdown 里只有表格能控制右对齐
-        lines.push(`| ${remainLine} | ${auth} |`);
-        lines.push(`| --- | ---: |`);
-    }
-    else {
-        lines.push(remainLine);
-    }
-    if (visible.length > 5) {
-        lines.push(``);
-        lines.push(t("_{0} packages, showing the first 5_", visible.length));
+    // 第一张表：Remaining 作表头，「提示 + 凭据有效期」作数据行；
+    // 同样是 4 列，结构与下方套餐表一致，末列右对齐
+    lines.push(`| ${remainLine} |  |  |  |`);
+    lines.push(`| --- | ---: | ---: | ---: |`);
+    if (hint || auth) {
+        lines.push(`| ${hint} |  |  | ${auth} |`);
     }
     lines.push(``);
     lines.push(t("| Package | Left | Total | Expires |"));
@@ -868,7 +865,7 @@ async function setAccessToken() {
     const cfg = getConfig();
     const value = await vscode.window.showInputBox({
         title: t("Access Token"),
-        prompt: t("Paste the CodeBuddy accessToken (JWT). Normally the extension reads it automatically — fill this only when auto-read failed."),
+        prompt: t("Paste the Access Token of the CodeBuddy extension (JWT). It is read automatically when possible — fill this only when auto-read failed."),
         placeHolder: "eyJhbGciOi…",
         value: cfg.get("accessToken", ""),
         password: true,

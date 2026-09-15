@@ -9,10 +9,13 @@ Shows your CodeBuddy credit balance in the VS Code status bar, and claims the da
 ## Zero-config start
 
 1. Install this extension (search `CodeBuddy Usage` in the Extensions marketplace, or install the `.vsix` file)
-2. Make sure the **CodeBuddy extension is installed and signed in** on this machine (Tencent Cloud CodeBuddy / coding-copilot)
+2. Install the **Tencent Cloud CodeBuddy** extension (`tencent-cloud.coding-copilot`) inside VS Code and sign in
 
-That's it. This extension automatically reads CodeBuddy's sign-in state (`accessToken`) to call the APIs —
-**no more copying Cookies by hand**. CodeBuddy keeps the token refreshed, so what we read is always current.
+> Only that **VS Code extension** is needed — the WorkBuddy / CodeBuddy desktop app is **not** required.
+> Its sign-in state is kept in VS Code's own credential store, and this extension reads it directly.
+
+That's it. This extension automatically reads the sign-in state (`accessToken`) saved by that extension —
+**no more copying Cookies by hand**. The CodeBuddy extension keeps the token refreshed, so what we read is always current.
 
 > **About the domains**: Tencent's "CodeBuddy" and "WorkBuddy" share the same account system and backend,
 > so signing in to either website works — no separate registration needed.
@@ -22,20 +25,23 @@ The status bar at the bottom right shows your remaining credits, e.g. `⚡ 2431.
 
 ![Status bar and tooltip](https://raw.githubusercontent.com/wwenc6621/CodeBuddy-Usage/main/resources/docs/tooltip-preview.png)
 
-### About the keychain prompt (it only appears once)
+### Credential access is requested only once
 
 The `accessToken` is stored encrypted locally (VS Code SecretStorage) and the decryption key lives in the
-system keychain. So the **first** read triggers one macOS prompt (it may ask for your login password) —
-click **Always Allow**.
+system credential store:
+
+- **macOS**: the Keychain. The first read shows one prompt (it may ask for your login password) —
+  click **Always Allow**;
+- **Windows**: DPAPI (current-user scope) — decrypted directly, no interaction at all.
 
 After that single read, the token is cached in the extension's own SecretStorage (using it needs no
-authorization), so **the keychain is not touched again until the token nears expiry (~60 days)**.
+authorization), so **the system credential store is not touched again until the token nears expiry (~60 days)**.
 If a read fails, the extension will **not** keep prompting — it asks you to paste a token once instead.
 
 ### When auto-read fails: paste an Access Token
 
-You need this fallback when: CodeBuddy is not installed, you are not on macOS (auto-read is macOS-only for now),
-or keychain access was denied / unavailable.
+You need this fallback when: CodeBuddy is not installed, you are on **Linux** (auto-read not ported yet),
+or the credential store is unavailable / access was denied.
 
 `Cmd/Ctrl + Shift + P` → **`CodeBuddy Usage: Paste Access Token (when auto-read fails)`** → paste the JWT.
 It stays valid for about 60 days; submitting an empty value clears it and retries auto-read.
@@ -70,11 +76,11 @@ Hovering the status bar shows today's status at the bottom, e.g. `✓ Checked in
 
 | Symptom                             | What to do                                                          |
 | ----------------------------------- | ------------------------------------------------------------------- |
-| Shows "No credentials found"        | Make sure CodeBuddy is signed in; otherwise set an Access Token     |
-| Shows "Login expired"               | CodeBuddy's session expired — sign in again, or set an Access Token |
+| Shows "No credentials found"        | Make sure the CodeBuddy extension is signed in inside VS Code; otherwise paste an Access Token |
+| Shows "Login expired"               | The CodeBuddy extension sign-in expired — sign in again in VS Code, or paste an Access Token   |
 | Shows "Fetch failed"                | Click the status bar item to retry                                  |
 | The number never changes            | Click the status bar item to refresh manually                       |
-| It asks for keychain access          | Click "Always Allow" the first time; if it still fails, paste an Access Token |
+| It asks for keychain access (macOS)  | Click "Always Allow" the first time; if it still fails, paste an Access Token |
 | You use the international site      | Set `apiBase` to `https://www.workbuddy.ai`                         |
 
 ---
@@ -94,8 +100,8 @@ Search for `codebuddyUsage` in VS Code settings:
 
 ## Privacy
 
-- The extension reads CodeBuddy's sign-in state (`accessToken`) locally only; credentials are **never uploaded anywhere** and never pass through a third party.
-- Decrypting the local sign-in state needs the system keychain (macOS): it is read only on the first run (or when the token nears expiry) — one "Always Allow" and you are done.
+- The extension reads the sign-in state (`accessToken`) saved by the CodeBuddy extension (inside VS Code) locally only; credentials are **never uploaded anywhere** and never pass through a third party.
+- Decrypting the local sign-in state needs the system credential store (macOS Keychain / Windows DPAPI): it is read only on the first run (or when the token nears expiry) — after that you are done.
 - The token is cached in the **extension's own SecretStorage** (encrypted by VS Code, still local only).
 - A manually entered `accessToken` is **stored only in your local VS Code configuration**.
 - Do not share these credentials. Signing out invalidates them immediately.

@@ -4,11 +4,11 @@
 
 All notable changes are documented in this file.
 
-## [0.9.1]
+## [0.9.2]
 
 ### Added
 
-- **Automatic CodeBuddy sign-in reuse (accessToken mode)**: when CodeBuddy is installed and signed in,
+- **Automatic CodeBuddy sign-in reuse (accessToken mode)**: when the CodeBuddy extension (in VS Code) is installed and signed in,
   the extension reads the `accessToken` (JWT) from its sign-in state and calls the APIs with
   `Authorization: Bearer` — no more Cookies, and no more Cookie expiry / UA-binding pain.
 - **Persistent token cache (the keychain is read once)**: the token read on the first run is cached in the
@@ -17,8 +17,12 @@ All notable changes are documented in this file.
   retrying for the session instead of repeatedly prompting.
 - New `codebuddyUsage.accessToken` setting and command **`CodeBuddy Usage: Paste Access Token (when auto-read fails)`**
   as the only manual fallback; submitting an empty value clears it and retries auto-read.
-- The hover tooltip now shows the auth source (e.g. `✓ Auto token · 11-14`) along with the token expiry date.
-- Reading state.vscdb now prefers Node's built-in `node:sqlite` and no longer requires the system `sqlite3` command.
+- The hover tooltip shows the credential expiry (e.g. `Valid until 11-14`) on the `Remaining` row, and only
+  shows "not signed in" when reading fails.
+- **Windows auto-read support**: the DPAPI-protected key is read from `<userData>/Local State` (via PowerShell)
+  and the sign-in state is decrypted with AES-256-GCM — no manual step at all.
+- Reading state.vscdb now tries `node:sqlite` → system `sqlite3` → a **built-in minimal SQLite parser**,
+  so no external command is required (Windows has no `sqlite3`).
 
 ### Changed
 
@@ -32,7 +36,8 @@ All notable changes are documented in this file.
 - Decrypting the local sign-in state requires the system keychain (macOS) — that is macOS's security model and
   cannot be bypassed. Persistent caching + "stop on failure" reduce the access rate to roughly once per 60 days;
   click "Always Allow" on the first prompt.
-- Auto-read is macOS-only for now; on Windows / Linux paste an `accessToken` manually.
+- Auto-read supports macOS (Keychain) and Windows (DPAPI); Linux's safeStorage uses the keyring and is not
+  ported yet, so paste an `accessToken` there.
 - The extension **never calls refreshToken**: CodeBuddy refreshes and writes back the token itself, so the extension
   simply re-reads it — avoiding two sides rotating each other's session.
 
