@@ -3,7 +3,7 @@
   "displayName": "CodeBuddy Usage",
   "description": "%extension.description%",
   "publisher": "wwenc6621",
-  "version": "0.9.0",
+  "version": "0.8.3",
   "icon": "resources/icon.png",
   "license": "MIT",
   "keywords": [
@@ -50,10 +50,6 @@
         "title": "%command.setCookie%"
       },
       {
-        "command": "codebuddyUsage.setAccessToken",
-        "title": "%command.setAccessToken%"
-      },
-      {
         "command": "codebuddyUsage.openUsagePage",
         "title": "%command.openUsagePage%"
       },
@@ -73,11 +69,6 @@
           "type": "string",
           "default": "",
           "description": "%config.cookie%"
-        },
-        "codebuddyUsage.accessToken": {
-          "type": "string",
-          "default": "",
-          "description": "%config.accessToken%"
         },
         "codebuddyUsage.userAgent": {
           "type": "string",
