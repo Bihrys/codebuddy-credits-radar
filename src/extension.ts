@@ -1,4 +1,13 @@
 import * as vscode from "vscode";
+import {
+  authHeaders,
+  getAuth,
+  invalidateAuth,
+  resetAutoReadBlock,
+  TokenStore,
+  useTokenStore,
+  AuthState,
+} from "./auth";
 
 /**
  * 本地化入口：语言自动跟随 VS Code 显示语言（vscode.env.language）。
@@ -75,6 +84,8 @@ let lastResult: UsageResult | undefined;
 let lastUpdatedAt: Date | undefined;
 let lastCheckin: CheckinResult | undefined;
 let lastBuddy: BuddyState | undefined;
+/** 最近一次刷新时生效的鉴权状态（用于悬浮框展示模式与 token 有效期） */
+let lastAuth: AuthState | undefined;
 let lastBuddyAutoDate = ""; // 本地日期字符串，用于「一日一次」自动触发出发守卫
 /** 已处理过的旅行标识（depart_at）：同一趟旅行只尝试领取一次，避免重复调用 claim */
 let lastBuddyClaimKey = "";
@@ -99,10 +110,8 @@ const DEFAULT_PACKAGE_CODES = [
 ];
 
 /**
- * 会话与 UA 强绑定：服务端签发 session 时会记录完整的 User-Agent，
- * 后续请求 UA 与之不一致即返回 401（实测改动其中任意一个字符都会被拒，
- * 且不同 Chrome 版本之间不互通，并非版本高低问题）。
- * 因此 UA 必须可配置，且与 Cookie 取自同一个浏览器请求。
+ * 请求 UA：保持浏览器 UA 形态（部分网关对非浏览器 UA 更严格）。
+ * accessToken 模式下 UA 不再与会话绑定，通常无需修改。
  */
 const DEFAULT_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36";
@@ -110,6 +119,69 @@ const DEFAULT_UA =
 /** 取生效 UA：用户配置优先，留空则回落内置默认值 */
 function getUA(): string {
   return getConfig().get<string>("userAgent", "").trim() || DEFAULT_UA;
+}
+
+/** 扩展自己的 SecretStorage（VS Code 负责加解密，读写不会触发系统授权） */
+let secretsStore: vscode.SecretStorage | undefined;
+/** 持久化 token 缓存键：把读到的 token 存下来，避免反复访问钥匙串 */
+const TOKEN_CACHE_KEY = "codebuddyUsage.cachedAccessToken";
+let tokenStore: TokenStore | undefined;
+
+/** 组装持久化 token 缓存实现（依赖 activate 中注入的 secretsStore） */
+function getTokenStore(): TokenStore | undefined {
+  if (!secretsStore) return undefined;
+  if (!tokenStore) {
+    const secrets = secretsStore;
+    tokenStore = {
+      get: async () => {
+        const raw = await secrets.get(TOKEN_CACHE_KEY);
+        if (!raw) return undefined;
+        try {
+          return JSON.parse(raw);
+        } catch {
+          return undefined;
+        }
+      },
+      set: async (value) => {
+        if (value) await secrets.store(TOKEN_CACHE_KEY, JSON.stringify(value));
+        else await secrets.delete(TOKEN_CACHE_KEY);
+      },
+    };
+  }
+  return tokenStore;
+}
+
+/**
+ * 读取当前生效的鉴权状态（见 auth.ts）：
+ * 持久化缓存 → 钥匙串自动读取 CodeBuddy 登录态 → 手动输入的 accessToken。
+ */
+async function currentAuth(): Promise<AuthState> {
+  return getAuth({ manualToken: getConfig().get<string>("accessToken", "") });
+}
+
+/**
+ * 带鉴权的 fetch：
+ * - 统一注入 `Authorization: Bearer`，UA 一并带上；
+ * - 遇到 401/403 时先清缓存（含持久化缓存）重试一次：CodeBuddy 可能刚刷新了 accessToken；
+ *   重试仍失败才抛 AUTH_EXPIRED，由 update() 统一提示。
+ */
+async function authFetch(url: string, init: RequestInit): Promise<Response> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const auth = await currentAuth();
+    if (auth.mode === "none") throw new Error("NO_CREDENTIALS");
+    const headers: Record<string, string> = {
+      ...((init.headers as Record<string, string> | undefined) ?? {}),
+      ...authHeaders(auth),
+      "user-agent": getUA(),
+    };
+    const resp = await fetch(url, { ...init, headers });
+    if (resp.status === 401 || resp.status === 403) {
+      invalidateAuth();
+      continue;
+    }
+    return resp;
+  }
+  throw new Error("AUTH_EXPIRED");
 }
 
 function getConfig() {
@@ -134,12 +206,7 @@ function icon(codicon: string): string {
 // ============================================================
 async function fetchUsage(): Promise<UsageResult> {
   const cfg = getConfig();
-  const cookie = cfg.get<string>("cookie", "").trim();
   const apiBase = cfg.get<string>("apiBase", "https://www.workbuddy.cn").replace(/\/$/, "");
-
-  if (!cookie) {
-    throw new Error("NO_COOKIE");
-  }
 
   const body = {
     PageNumber: 1,
@@ -151,23 +218,18 @@ async function fetchUsage(): Promise<UsageResult> {
     NeedInUsage: true,
   };
 
-  const resp = await fetch(`${apiBase}/billing/meter/get-user-resource`, {
+  const resp = await authFetch(`${apiBase}/billing/meter/get-user-resource`, {
     method: "POST",
     headers: {
       accept: "application/json, text/plain, */*",
       "content-type": "application/json",
-      cookie: cookie,
       origin: apiBase,
       referer: `${apiBase}/profile/plans-usage`,
       "x-client-platform": "web",
-      "user-agent": getUA(),
     },
     body: JSON.stringify(body),
   });
 
-  if (resp.status === 401 || resp.status === 403) {
-    throw new Error("COOKIE_EXPIRED");
-  }
   if (!resp.ok) {
     throw new Error(`HTTP_${resp.status}`);
   }
@@ -205,22 +267,18 @@ async function fetchUsage(): Promise<UsageResult> {
 }
 
 // ============================================================
-// 2. 签到（与用量查询共用 Cookie 鉴权，不再读取本地桌面端登录态）
+// 2. 签到（与用量查询共用 accessToken 鉴权）
 // ============================================================
 
-/** 拼装签到接口请求头（与 fetchUsage 共用同一 Cookie） */
-function checkinRequestHeaders(): Record<string, string> {
-  const cfg = getConfig();
-  const cookie = cfg.get<string>("cookie", "").trim();
-  const apiBase = cfg.get<string>("apiBase", "https://www.workbuddy.cn").replace(/\/$/, "");
+/** 拼装签到接口的公共请求头（鉴权头由 authFetch 统一注入） */
+function checkinHeaders(): Record<string, string> {
+  const apiBase = getConfig().get<string>("apiBase", "https://www.workbuddy.cn").replace(/\/$/, "");
   return {
     "content-type": "application/json",
     accept: "application/json",
-    cookie,
     origin: apiBase,
     referer: `${apiBase}/profile/plans-usage`,
     "x-client-platform": "web",
-    "user-agent": getUA(),
   };
 }
 
@@ -239,15 +297,11 @@ async function fetchCheckinStatus(): Promise<CheckinResult> {
   const cfg = getConfig();
   const apiBase = cfg.get<string>("apiBase", "https://www.workbuddy.cn").replace(/\/$/, "");
   try {
-    const resp = await fetch(`${apiBase}/billing/meter/checkin-status`, {
+    const resp = await authFetch(`${apiBase}/billing/meter/checkin-status`, {
       method: "POST",
-      headers: checkinRequestHeaders(),
+      headers: checkinHeaders(),
       body: "{}",
     });
-    // Cookie 失效：抛出让 update() 统一提示用户重新配置
-    if (resp.status === 401 || resp.status === 403) {
-      throw new Error("COOKIE_EXPIRED");
-    }
     let json: any = null;
     try {
       json = await resp.json();
@@ -268,7 +322,7 @@ async function fetchCheckinStatus(): Promise<CheckinResult> {
     }
     return { state: "unclaimed" };
   } catch (e: any) {
-    if (e?.message === "COOKIE_EXPIRED") throw e;
+    if (e?.message === "AUTH_EXPIRED" || e?.message === "NO_CREDENTIALS") throw e;
     return { state: "unknown", error: e?.message ?? String(e) };
   }
 }
@@ -278,15 +332,11 @@ async function doCheckin(): Promise<CheckinResult> {
   const cfg = getConfig();
   const apiBase = cfg.get<string>("apiBase", "https://www.workbuddy.cn").replace(/\/$/, "");
   try {
-    const resp = await fetch(`${apiBase}/billing/meter/daily-checkin`, {
+    const resp = await authFetch(`${apiBase}/billing/meter/daily-checkin`, {
       method: "POST",
-      headers: checkinRequestHeaders(),
+      headers: checkinHeaders(),
       body: "{}",
     });
-    // Cookie 失效：抛出让 update() 统一提示用户重新配置
-    if (resp.status === 401 || resp.status === 403) {
-      throw new Error("COOKIE_EXPIRED");
-    }
     let json: any = null;
     try {
       json = await resp.json();
@@ -315,19 +365,19 @@ async function doCheckin(): Promise<CheckinResult> {
     if (st.state === "claimed") return st;
     return { state: "unknown", error: `code=${code} msg=${json?.msg ?? ""}` };
   } catch (e: any) {
-    if (e?.message === "COOKIE_EXPIRED") throw e;
+    if (e?.message === "AUTH_EXPIRED" || e?.message === "NO_CREDENTIALS") throw e;
     return { state: "unknown", error: e?.message ?? String(e) };
   }
 }
 
 /**
  * 获取今日签到状态；若尚未签到则自动领取。
- * 与用量查询共用 Cookie 鉴权；Cookie 缺失/失效时返回 unknown（不影响主流程）。
+ * 与用量查询共用同一鉴权；未配置任何凭据时返回 unknown（不影响主流程）。
  */
 async function ensureCheckin(): Promise<CheckinResult> {
-  const cookie = getConfig().get<string>("cookie", "").trim();
-  if (!cookie) {
-    return { state: "unknown", error: t("No Cookie set") };
+  const auth = await currentAuth();
+  if (auth.mode === "none") {
+    return { state: "unknown", error: t("No credentials found") };
   }
   const status = await fetchCheckinStatus();
   if (status.state === "claimed") {
@@ -344,32 +394,24 @@ async function ensureCheckin(): Promise<CheckinResult> {
 // ============================================================
 const BUDDY_PATH = "/activity/growth/buddy/travel";
 
-/** 拼装喵喵接口请求头（与 fetchUsage 共用同一 Cookie） */
-function buddyRequestHeaders(): Record<string, string> {
-  const cfg = getConfig();
-  const cookie = cfg.get<string>("cookie", "").trim();
-  const apiBase = cfg.get<string>("apiBase", "https://www.workbuddy.cn").replace(/\/$/, "");
+/** 拼装喵喵接口的公共请求头（鉴权头由 authFetch 统一注入） */
+function buddyHeaders(): Record<string, string> {
+  const apiBase = getConfig().get<string>("apiBase", "https://www.workbuddy.cn").replace(/\/$/, "");
   return {
     "content-type": "application/json",
     accept: "application/json, text/plain, */*",
-    cookie,
     origin: apiBase,
     referer: `${apiBase}/profile/growth-center`,
     "x-client-platform": "web",
-    "user-agent": getUA(),
   };
 }
 
-/** 调用喵喵接口，统一抛出 Cookie 失效错误 */
+/** 调用喵喵接口（鉴权失败由 authFetch 抛出 AUTH_EXPIRED / NO_CREDENTIALS） */
 async function callBuddyApi(sub: string, method: string, body?: string): Promise<any> {
-  const cfg = getConfig();
-  const cookie = cfg.get<string>("cookie", "").trim();
-  if (!cookie) throw new Error("NO_COOKIE");
-  const apiBase = cfg.get<string>("apiBase", "https://www.workbuddy.cn").replace(/\/$/, "");
-  const init: RequestInit = { method, headers: buddyRequestHeaders() };
+  const apiBase = getConfig().get<string>("apiBase", "https://www.workbuddy.cn").replace(/\/$/, "");
+  const init: RequestInit = { method, headers: buddyHeaders() };
   if (body !== undefined) init.body = body;
-  const resp = await fetch(`${apiBase}${BUDDY_PATH}/${sub}`, init);
-  if (resp.status === 401 || resp.status === 403) throw new Error("COOKIE_EXPIRED");
+  const resp = await authFetch(`${apiBase}${BUDDY_PATH}/${sub}`, init);
   const json: any = await resp.json().catch(() => ({}));
   return json;
 }
@@ -385,13 +427,13 @@ async function fetchBuddyStatus(): Promise<BuddyStatus | null> {
       departAt: d.depart_at,
       arriveAt: d.arrive_at,
       serverNow: d.server_now,
-      durationHours: d.duration_hours,
+      // duration_hours 实际位于 location 子对象里（顶层通常没有），两处都兜底
+      durationHours: d.duration_hours ?? d.location?.duration_hours,
       rewardCredit: d.reward_credit,
       dailyLimitReached: d.daily_limit_reached,
       locationName: d.location?.name,
     };
-  } catch (e: any) {
-    if (e?.message === "COOKIE_EXPIRED" || e?.message === "NO_COOKIE") return null;
+  } catch {
     return null;
   }
 }
@@ -433,7 +475,7 @@ async function claimBuddy(): Promise<{ credit?: number; claimed?: boolean; error
     if (/no unclaimed/i.test(msg)) return { credit: 0 };
     return { error: msg };
   } catch (e: any) {
-    if (e?.message === "COOKIE_EXPIRED" || e?.message === "NO_COOKIE") throw e;
+    if (e?.message === "AUTH_EXPIRED" || e?.message === "NO_CREDENTIALS") throw e;
     return { error: e?.message ?? String(e) };
   }
 }
@@ -468,7 +510,7 @@ async function departBuddy(locationId = 1): Promise<{ hours?: number; error?: st
     }
     return { error: json?.msg ?? `HTTP_${json?.code ?? ""}` };
   } catch (e: any) {
-    if (e?.message === "COOKIE_EXPIRED" || e?.message === "NO_COOKIE") throw e;
+    if (e?.message === "AUTH_EXPIRED" || e?.message === "NO_CREDENTIALS") throw e;
     return { error: e?.message ?? String(e) };
   }
 }
@@ -636,6 +678,7 @@ async function update() {
   statusBarItem.show();
 
   try {
+    lastAuth = await currentAuth();
     const autoCheckin = getConfig().get<boolean>("autoCheckin", true);
     // 先签到 + 派喵喵领取积分，再拉取用量。
     // 否则用量接口会在积分到账前就返回，导致余量/总量不含本次领取的积分。
@@ -672,16 +715,21 @@ async function update() {
     notifyBuddyResult(buddy);
   } catch (e: any) {
     const msg = e?.message ?? String(e);
-    if (msg === "NO_COOKIE") {
-      statusBarItem.text = `${icon("key")} ${t("No Cookie set")}`;
-      statusBarItem.tooltip = t("Click to set login Cookie");
-      statusBarItem.command = "codebuddyUsage.setCookie";
+    if (msg === "NO_CREDENTIALS") {
+      const note = lastAuth?.note;
+      statusBarItem.text = `${icon("key")} ${t("No credentials found")}`;
+      statusBarItem.tooltip =
+        t("Sign in to CodeBuddy, or set an Access Token manually") + (note ? `\n\n${note}` : "");
+      statusBarItem.command = "codebuddyUsage.setAccessToken";
       statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
       statusBarItem.show();
-    } else if (msg === "COOKIE_EXPIRED") {
-      statusBarItem.text = `${icon("error")} ${t("Cookie expired")}`;
-      statusBarItem.tooltip = t("Click to re-set login Cookie");
-      statusBarItem.command = "codebuddyUsage.setCookie";
+    } else if (msg === "AUTH_EXPIRED") {
+      const note = lastAuth?.note;
+      statusBarItem.text = `${icon("error")} ${t("Login expired")}`;
+      statusBarItem.tooltip =
+        t("CodeBuddy login expired — sign in again, or set an Access Token manually") +
+        (note ? `\n\n${note}` : "");
+      statusBarItem.command = "codebuddyUsage.setAccessToken";
       statusBarItem.backgroundColor = new vscode.ThemeColor("statusBarItem.errorBackground");
       statusBarItem.show();
     } else {
@@ -694,6 +742,21 @@ async function update() {
   } finally {
     updating = false;
   }
+}
+
+/** 悬浮框中「鉴权」标签：展示凭据来源（自动读取 / 手动输入）与 token 有效期 */
+function authTag(): string {
+  const a = lastAuth;
+  if (!a) return "";
+  if (a.token) {
+    const d = a.expiresAt ? new Date(a.expiresAt) : undefined;
+    const p = (n: number) => String(n).padStart(2, "0");
+    const when = d ? `${p(d.getMonth() + 1)}-${p(d.getDate())}` : "?";
+    return a.mode === "token-auto"
+      ? t("`✓ Auto token · {0}`", when)
+      : t("`✓ Token · {0}`", when);
+  }
+  return t("`⚠ No credentials`");
 }
 
 function checkinTag(): string {
@@ -816,9 +879,10 @@ function buildTooltip(res: UsageResult, updatedAt?: Date): vscode.MarkdownString
     }
   }
   // 底部行并入同一张表：左列=签到标签 + 喵喵状态，末列=最近更新（右对齐贴右缘）
+  const auth = authTag();
   const tag = checkinTag();
   const buddy = buddyTag();
-  const left = [tag, buddy].filter(Boolean).join("  ");
+  const left = [auth, tag, buddy].filter(Boolean).join("  ");
   if (updatedAt) {
     lines.push(t("| {0} |  | Updated | {1} |", left, formatDateTime(updatedAt)));
   } else if (left) {
@@ -844,75 +908,38 @@ function scheduleTimer() {
 }
 
 /**
- * 凭证录入：顺序弹出两个输入框（Cookie → User-Agent）。
+ * 手动输入 Access Token —— 自动读取失败时的唯一兜底路径。
  *
- * 为什么是两个框而不是一个表单：
- *  VS Code 的 showInputBox 一次只收一个值，无法容纳两个字段；
- *  这里改为连续弹出两次，并在标题上标注 (1/2)(2/2) 提示当前进度。
+ * 正常情况下无需手动输入：扩展会自动读取 CodeBuddy 登录态，并且 CodeBuddy
+ * 自己会刷新 token 写回本地。只有当自动读取失败（未安装 / 非 macOS / 钥匙串被拒）
+ * 时，才需要在这里粘贴一次。
  *
- * 取消语义：任一步按 Esc 都整体放弃，不写入任何值。
- *  因为 Cookie 与 UA 必须配对，只更新其中一个反而会立刻 401，
- *  半途写入比完全不写更糟。
+ * 留空表示清除手动值，并重新尝试自动读取。
  */
-async function setCookie() {
+async function setAccessToken() {
   const cfg = getConfig();
-
-  // (1/2) Cookie
-  const cookie = await vscode.window.showInputBox({
-    title: t("(1/2) Login credentials — Cookie"),
-    prompt: t("Paste the Cookie copied from www.workbuddy.cn/profile/plans-usage"),
-    placeHolder: "qcloud_from=...; session=...; session_2=...; i18next=zh-CN",
-    value: cfg.get<string>("cookie", ""),
-    ignoreFocusOut: true,
-  });
-  // Esc：整体放弃
-  if (cookie === undefined) return;
-
-  // (2/2) User-Agent
-  const uaVer = DEFAULT_UA.match(/Chrome\/[\d.]+/)?.[0] ?? DEFAULT_UA;
-  const userAgent = await vscode.window.showInputBox({
-    title: t("(2/2) Login credentials — User-Agent"),
+  const value = await vscode.window.showInputBox({
+    title: t("Access Token"),
     prompt: t(
-      "Must come from the same request as the Cookie, otherwise the server returns 401. Leave empty to use the built-in default ({0})",
-      uaVer
+      "Paste the CodeBuddy accessToken (JWT). Normally the extension reads it automatically — fill this only when auto-read failed."
     ),
-    placeHolder: DEFAULT_UA,
-    value: cfg.get<string>("userAgent", ""),
+    placeHolder: "eyJhbGciOi…",
+    value: cfg.get<string>("accessToken", ""),
+    password: true,
     ignoreFocusOut: true,
   });
-  // Esc：整体放弃，避免 Cookie 已更新而 UA 仍是旧的，两者不匹配
-  if (userAgent === undefined) {
-    vscode.window.showInformationMessage(
-      t("CodeBuddy Usage: Cancelled, neither Cookie nor User-Agent was saved")
-    );
-    return;
-  }
+  if (value === undefined) return;
 
-  try {
-    await cfg.update("cookie", cookie.trim(), vscode.ConfigurationTarget.Global);
-    await cfg.update("userAgent", userAgent.trim(), vscode.ConfigurationTarget.Global);
-  } catch (e: any) {
-    vscode.window.showErrorMessage(
-      t("CodeBuddy Usage: Failed to save credentials ({0})", e?.message ?? String(e))
-    );
-    return;
-  }
-
-  // 回显实际生效的 UA，便于确认是否真的存进去了
-  const ver = getUA().match(/Chrome\/[\d.]+/)?.[0] ?? t("unknown version");
-  const isDefault = !userAgent.trim();
+  const trimmed = value.trim();
+  await cfg.update("accessToken", trimmed, vscode.ConfigurationTarget.Global);
+  invalidateAuth();
+  // 清空手动值：解除钥匙串封锁，下次刷新重新尝试自动读取
+  if (!trimmed) resetAutoReadBlock();
   vscode.window.showInformationMessage(
-    isDefault
-      ? t(
-          "CodeBuddy Usage: Credentials saved (local only), active UA: {0} (built-in default)",
-          ver
-        )
-      : t("CodeBuddy Usage: Credentials saved (local only), active UA: {0}", ver)
+    trimmed
+      ? t("CodeBuddy Usage: Access Token saved")
+      : t("CodeBuddy Usage: Access Token cleared, retrying auto-read")
   );
-
-  // 配置变更会触发 onDidChangeConfiguration 中的 update()；
-  // 此处再调一次覆盖「只改了 UA、cookie 未变」的情况，
-  // update() 内部的 updating 守卫保证并发只生效一次。
   update();
 }
 
@@ -951,10 +978,12 @@ async function buddyClaimCmd() {
       }
     }
   } catch (e: any) {
-    if (e?.message === "COOKIE_EXPIRED") {
-      statusBarItem.text = `${icon("error")} ${t("Cookie expired")}`;
-      statusBarItem.tooltip = t("Click to re-set login Cookie");
-      statusBarItem.command = "codebuddyUsage.setCookie";
+    if (e?.message === "AUTH_EXPIRED" || e?.message === "NO_CREDENTIALS") {
+      statusBarItem.text = `${icon("error")} ${t("Login expired")}`;
+      statusBarItem.tooltip = t(
+        "CodeBuddy login expired — sign in again, or set an Access Token manually"
+      );
+      statusBarItem.command = "codebuddyUsage.setAccessToken";
       statusBarItem.show();
       return;
     }
@@ -986,10 +1015,12 @@ async function buddyDepartCmd() {
       );
     }
   } catch (e: any) {
-    if (e?.message === "COOKIE_EXPIRED") {
-      statusBarItem.text = `${icon("error")} ${t("Cookie expired")}`;
-      statusBarItem.tooltip = t("Click to re-set login Cookie");
-      statusBarItem.command = "codebuddyUsage.setCookie";
+    if (e?.message === "AUTH_EXPIRED" || e?.message === "NO_CREDENTIALS") {
+      statusBarItem.text = `${icon("error")} ${t("Login expired")}`;
+      statusBarItem.tooltip = t(
+        "CodeBuddy login expired — sign in again, or set an Access Token manually"
+      );
+      statusBarItem.command = "codebuddyUsage.setAccessToken";
       statusBarItem.show();
       return;
     }
@@ -1014,6 +1045,12 @@ export function activate(context: vscode.ExtensionContext) {
   statusBarItem.show();
   context.subscriptions.push(statusBarItem);
 
+  // 注入扩展自己的 SecretStorage 作为 token 持久化缓存：
+  // 它由 VS Code 负责加解密，读写不会触发系统授权，
+  // 从而把「读钥匙串」的频率压缩到 token 有效期内仅一次。
+  secretsStore = context.secrets;
+  useTokenStore(getTokenStore());
+
   context.subscriptions.push(
     vscode.commands.registerCommand("codebuddyUsage.showDetail", () => update())
   );
@@ -1021,7 +1058,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("codebuddyUsage.refresh", () => update())
   );
   context.subscriptions.push(
-    vscode.commands.registerCommand("codebuddyUsage.setCookie", () => setCookie())
+    vscode.commands.registerCommand("codebuddyUsage.setAccessToken", () => setAccessToken())
   );
   context.subscriptions.push(
     vscode.commands.registerCommand("codebuddyUsage.openUsagePage", () => {
@@ -1045,7 +1082,7 @@ export function activate(context: vscode.ExtensionContext) {
         scheduleTimer();
       }
       if (
-        e.affectsConfiguration("codebuddyUsage.cookie") ||
+        e.affectsConfiguration("codebuddyUsage.accessToken") ||
         e.affectsConfiguration("codebuddyUsage.userAgent")
       ) {
         update();

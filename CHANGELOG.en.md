@@ -4,6 +4,38 @@
 
 All notable changes are documented in this file.
 
+## [0.9.0]
+
+### Added
+
+- **Automatic CodeBuddy sign-in reuse (accessToken mode)**: when CodeBuddy is installed and signed in,
+  the extension reads the `accessToken` (JWT) from its sign-in state and calls the APIs with
+  `Authorization: Bearer` — no more Cookies, and no more Cookie expiry / UA-binding pain.
+- **Persistent token cache (the keychain is read once)**: the token read on the first run is cached in the
+  extension's own SecretStorage (encrypted by VS Code, no authorization needed to use it), so the keychain
+  is not touched again until the token nears expiry (~60 days). If a keychain read fails, the extension stops
+  retrying for the session instead of repeatedly prompting.
+- New `codebuddyUsage.accessToken` setting and command **`CodeBuddy Usage: Paste Access Token (when auto-read fails)`**
+  as the only manual fallback; submitting an empty value clears it and retries auto-read.
+- The hover tooltip now shows the auth source (e.g. `✓ Auto token · 11-14`) along with the token expiry date.
+- Reading state.vscdb now prefers Node's built-in `node:sqlite` and no longer requires the system `sqlite3` command.
+
+### Changed
+
+- **Cookie mode removed**: the `codebuddyUsage.cookie` setting and the "Set login credentials (Cookie + User-Agent)"
+  command are gone; authentication is now accessToken-only.
+- The "No Cookie set" notice became "No credentials found", and "Cookie expired" became "Login expired";
+  the hover tooltip now also includes the concrete reason (e.g. keychain access denied).
+
+### Notes
+
+- Decrypting the local sign-in state requires the system keychain (macOS) — that is macOS's security model and
+  cannot be bypassed. Persistent caching + "stop on failure" reduce the access rate to roughly once per 60 days;
+  click "Always Allow" on the first prompt.
+- Auto-read is macOS-only for now; on Windows / Linux paste an `accessToken` manually.
+- The extension **never calls refreshToken**: CodeBuddy refreshes and writes back the token itself, so the extension
+  simply re-reads it — avoiding two sides rotating each other's session.
+
 ## [0.8.3]
 
 ### Added

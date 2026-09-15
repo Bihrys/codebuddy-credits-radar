@@ -1,12 +1,22 @@
 {
-  "No Cookie set": "未设置 Cookie",
   "Refreshing…": "刷新中…",
   "Fetching CodeBuddy usage…": "正在拉取 CodeBuddy 用量…",
-  "Click to set login Cookie": "点击设置登录 Cookie",
-  "Cookie expired": "Cookie 已失效",
-  "Click to re-set login Cookie": "点击重新设置登录 Cookie",
   "Fetch failed": "拉取失败",
   "Error: {0}\nClick to retry": "错误: {0}\n点击重试",
+
+  "No credentials found": "未找到登录凭据",
+  "Sign in to CodeBuddy, or set an Access Token manually": "请先登录 CodeBuddy，或手动设置 Access Token",
+  "Login expired": "登录已过期",
+  "CodeBuddy login expired — sign in again, or set an Access Token manually": "CodeBuddy 登录已过期 — 请重新登录，或手动设置 Access Token",
+
+  "`✓ Auto token · {0}`": "`✓ 自动 Token · {0}`",
+  "`✓ Token · {0}`": "`✓ 手动 Token · {0}`",
+  "`⚠ No credentials`": "`⚠ 未配置凭据`",
+
+  "Access Token": "Access Token",
+  "Paste the CodeBuddy accessToken (JWT). Normally the extension reads it automatically — fill this only when auto-read failed.": "粘贴 CodeBuddy 的 accessToken（JWT）。正常情况下扩展会自动读取，仅当自动读取失败时才需要填写。",
+  "CodeBuddy Usage: Access Token saved": "CodeBuddy Usage: Access Token 已保存",
+  "CodeBuddy Usage: Access Token cleared, retrying auto-read": "CodeBuddy Usage: Access Token 已清除，将重新尝试自动读取",
 
   "CodeBuddy Usage: Daily check-in done": "CodeBuddy Usage: 今日积分已签到",
   "CodeBuddy Usage: Daily check-in done (+{0})": "CodeBuddy Usage: 今日积分已签到（+{0}）",
@@ -45,15 +55,5 @@
   "_{0} packages, showing the first 5_": "_共 {0} 个有余量套餐，仅显示前 5 条_",
   "| Package | Left | Total | Expires |": "| 套餐 | 剩余 | 总量 | 到期 |",
   "| _No packages left_ |  |  |  |": "| _暂无有余量的套餐_ |  |  |  |",
-  "| {0} |  | Updated | {1} |": "| {0} |  | 最近更新 | {1} |",
-
-  "(1/2) Login credentials — Cookie": "(1/2) 登录凭证 — Cookie",
-  "Paste the Cookie copied from www.workbuddy.cn/profile/plans-usage": "粘贴从 www.workbuddy.cn/profile/plans-usage 复制的 Cookie",
-  "(2/2) Login credentials — User-Agent": "(2/2) 登录凭证 — User-Agent",
-  "Must come from the same request as the Cookie, otherwise the server returns 401. Leave empty to use the built-in default ({0})": "必须与 Cookie 取自同一个请求，否则返回 401。留空则使用内置默认值（{0}）",
-  "CodeBuddy Usage: Cancelled, neither Cookie nor User-Agent was saved": "CodeBuddy Usage: 已取消，Cookie 与 User-Agent 均未保存",
-  "CodeBuddy Usage: Failed to save credentials ({0})": "CodeBuddy Usage: 凭证保存失败（{0}）",
-  "CodeBuddy Usage: Credentials saved (local only), active UA: {0}": "CodeBuddy Usage: 凭证已保存（仅存于本地），生效 UA：{0}",
-  "CodeBuddy Usage: Credentials saved (local only), active UA: {0} (built-in default)": "CodeBuddy Usage: 凭证已保存（仅存于本地），生效 UA：{0}（内置默认值）",
-  "unknown version": "未知版本"
+  "| {0} |  | Updated | {1} |": "| {0} |  | 最近更新 | {1} |"
 }

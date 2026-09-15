@@ -6,39 +6,39 @@ Shows your CodeBuddy credit balance in the VS Code status bar, and claims the da
 
 ---
 
-## Getting started in three steps
+## Zero-config start
 
-### 1. Install the extension
+1. Install this extension (search `CodeBuddy Usage` in the Extensions marketplace, or install the `.vsix` file)
+2. Make sure the **CodeBuddy extension is installed and signed in** on this machine (Tencent Cloud CodeBuddy / coding-copilot)
 
-Search for `CodeBuddy Usage` in the Extensions marketplace, or install the `.vsix` file.
-
-### 2. Copy two values from the website
+That's it. This extension automatically reads CodeBuddy's sign-in state (`accessToken`) to call the APIs —
+**no more copying Cookies by hand**. CodeBuddy keeps the token refreshed, so what we read is always current.
 
 > **About the domains**: Tencent's "CodeBuddy" and "WorkBuddy" share the same account system and backend,
-> so signing in to either website works with this extension — no separate registration needed.
-> By default this extension reads data from the WorkBuddy website (its pages offer claimable credits),
-> so **start by opening the WorkBuddy website** and signing in.
-
-1. Open [https://www.workbuddy.cn/profile/plans-usage](https://www.workbuddy.cn/profile/plans-usage) in your browser and sign in
-2. Press `F12` to open DevTools → switch to the `Network` tab → reload the page
-3. Filter the request list by `Fetch/XHR`, then pick any request, e.g. `get-user-resource`
-4. In `Headers` → `Request Headers`, right-click the `cookie` row and choose **Copy value**:
-
-   ![Copy Cookie](https://raw.githubusercontent.com/wwenc6621/CodeBuddy-Usage/main/resources/docs/copy-cookie.png)
-5. Scroll further down in the same request, find the `user-agent` row, and **Copy value** as well:
-
-   ![Copy User-Agent](https://raw.githubusercontent.com/wwenc6621/CodeBuddy-Usage/main/resources/docs/copy-useragent.png)
-
-> The two belong together. Copying them from different requests, or keeping a stale one, may result in "Cookie expired".
-
-### 3. Paste them into VS Code
-
-`Cmd/Ctrl + Shift + P` → run **`CodeBuddy Usage: Set login credentials (Cookie + User-Agent)`** →
-paste the Cookie and press Enter, then paste the User-Agent and press Enter.
+> so signing in to either website works — no separate registration needed.
+> By default this extension reads data from the WorkBuddy website (its pages offer claimable credits).
 
 The status bar at the bottom right shows your remaining credits, e.g. `⚡ 2431.68`. Hover over it for the details:
 
 ![Status bar and tooltip](https://raw.githubusercontent.com/wwenc6621/CodeBuddy-Usage/main/resources/docs/tooltip-preview.png)
+
+### About the keychain prompt (it only appears once)
+
+The `accessToken` is stored encrypted locally (VS Code SecretStorage) and the decryption key lives in the
+system keychain. So the **first** read triggers one macOS prompt (it may ask for your login password) —
+click **Always Allow**.
+
+After that single read, the token is cached in the extension's own SecretStorage (using it needs no
+authorization), so **the keychain is not touched again until the token nears expiry (~60 days)**.
+If a read fails, the extension will **not** keep prompting — it asks you to paste a token once instead.
+
+### When auto-read fails: paste an Access Token
+
+You need this fallback when: CodeBuddy is not installed, you are not on macOS (auto-read is macOS-only for now),
+or keychain access was denied / unavailable.
+
+`Cmd/Ctrl + Shift + P` → **`CodeBuddy Usage: Paste Access Token (when auto-read fails)`** → paste the JWT.
+It stays valid for about 60 days; submitting an empty value clears it and retries auto-read.
 
 ---
 
@@ -68,13 +68,14 @@ Hovering the status bar shows today's status at the bottom, e.g. `✓ Checked in
 
 ## Something wrong?
 
-| Symptom                             | What to do                                                       |
-| ----------------------------------- | ---------------------------------------------------------------- |
-| Status bar shows "No Cookie set"    | Click it and go through steps 2 and 3 above                      |
-| Shows "Cookie expired"              | The Cookie expired, or it does not match the UA — copy both again |
-| Shows "Fetch failed"                | Click the status bar item to retry                               |
-| The number never changes            | Click the status bar item to refresh manually                    |
-| You use the international site      | Set `apiBase` to `https://www.workbuddy.ai`                      |
+| Symptom                             | What to do                                                          |
+| ----------------------------------- | ------------------------------------------------------------------- |
+| Shows "No credentials found"        | Make sure CodeBuddy is signed in; otherwise set an Access Token     |
+| Shows "Login expired"               | CodeBuddy's session expired — sign in again, or set an Access Token |
+| Shows "Fetch failed"                | Click the status bar item to retry                                  |
+| The number never changes            | Click the status bar item to refresh manually                       |
+| It asks for keychain access          | Click "Always Allow" the first time; if it still fails, paste an Access Token |
+| You use the international site      | Set `apiBase` to `https://www.workbuddy.ai`                         |
 
 ---
 
@@ -84,8 +85,8 @@ Search for `codebuddyUsage` in VS Code settings:
 
 | Setting                   | Default                      | Description                                                          |
 | ------------------------- | ---------------------------- | -------------------------------------------------------------------- |
-| `cookie`                  | empty                        | The string you copied after signing in                               |
-| `userAgent`               | empty                        | Empty uses the built-in default; **must be copied from the same request as the Cookie** |
+| `accessToken`             | empty                        | JWT to paste when auto-read fails. **Normally not needed**            |
+| `userAgent`               | empty                        | Request UA; empty uses the built-in default                           |
 | `refreshIntervalMinutes`  | 30                           | Auto refresh interval (minutes); set 0 to disable                    |
 | `autoCheckin`             | on                           | Automatic daily check-in                                             |
 | `buddyTravel`             | on                           | Automatic buddy travel                                               |
@@ -93,8 +94,11 @@ Search for `codebuddyUsage` in VS Code settings:
 
 ## Privacy
 
-- The Cookie and User-Agent are **stored only in your local VS Code configuration**. They are never uploaded anywhere and never pass through a third party.
-- Do not share these two values. When you are done, sign out on the website and they become invalid immediately.
+- The extension reads CodeBuddy's sign-in state (`accessToken`) locally only; credentials are **never uploaded anywhere** and never pass through a third party.
+- Decrypting the local sign-in state needs the system keychain (macOS): it is read only on the first run (or when the token nears expiry) — one "Always Allow" and you are done.
+- The token is cached in the **extension's own SecretStorage** (encrypted by VS Code, still local only).
+- A manually entered `accessToken` is **stored only in your local VS Code configuration**.
+- Do not share these credentials. Signing out invalidates them immediately.
 
 ## Build it yourself
 
