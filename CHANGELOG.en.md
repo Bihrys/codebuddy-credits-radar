@@ -4,6 +4,31 @@
 
 All notable changes are documented in this file.
 
+## [0.9.0]
+
+### Added
+
+- **Automatic CodeBuddy sign-in reuse (accessToken mode)**: when CodeBuddy is installed and signed in,
+  the extension reads the `accessToken` (JWT) from its sign-in state and calls the APIs with
+  `Authorization: Bearer` — **no more copying Cookies by hand, and no more Cookie expiry / UA-binding pain**.
+  The read result is cached for 5 minutes; on 401 the cache is cleared and re-read once (CodeBuddy may have
+  just refreshed the token).
+- New `codebuddyUsage.accessToken` setting and command **`CodeBuddy Usage: Set Access Token (optional fallback)`**
+  for when auto-read is unavailable (CodeBuddy not installed, non-macOS, or keychain access denied).
+- The hover tooltip now shows the active auth mode (e.g. `✓ Auto token · 11-14`) along with the token expiry date.
+
+### Changed
+
+- Cookie mode is now a legacy fallback: it is used only when neither auto-read nor a manual `accessToken` is available.
+- The "No Cookie set" notice became "No credentials found", and "Cookie expired" became "Login expired".
+
+### Notes
+
+- Auto-read needs the system keychain (macOS) to decrypt the local sign-in state; the first read shows a prompt —
+  click "Always Allow" and it stops asking. Auto-read is macOS-only for now; other platforms can set `accessToken` manually.
+- The extension **never calls refreshToken**: CodeBuddy refreshes and writes back the token itself, so the extension
+  simply re-reads it — avoiding two sides rotating each other's session.
+
 ## [0.8.3]
 
 ### Added

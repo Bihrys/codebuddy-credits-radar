@@ -4,6 +4,30 @@
 
 所有值得注意的变更都会记录在此文件。
 
+## [0.9.0]
+
+### 新增
+
+- **自动读取 CodeBuddy 登录态（accessToken 模式）**：本机装了 CodeBuddy 并登录后，
+  扩展直接读取其登录态里的 `accessToken`（JWT），以 `Authorization: Bearer` 调用接口，
+  **不再需要手动复制 Cookie，也不再受 Cookie 快速失效、与 UA 强绑定的困扰**。
+  读取结果缓存 5 分钟；遇到 401 会清缓存重读一次（CodeBuddy 可能刚刷新了 token）。
+- 新增 `codebuddyUsage.accessToken` 配置与命令 **`CodeBuddy Usage: 设置 Access Token（可选兜底）`**，
+  用于自动读取不可用时（未安装 CodeBuddy / 非 macOS / 钥匙串授权被拒）手动兜底。
+- 悬浮框底部新增鉴权状态标签（如 `✓ 自动 Token · 11-14`），并展示 token 到期日。
+
+### 变更
+
+- Cookie 模式降级为「旧模式」：仅在既无法自动读取、也没有手动 `accessToken` 时才使用。
+- 未配置凭据的提示由「未设置 Cookie」改为「未找到登录凭据」，401 提示由「Cookie 已失效」改为「登录已过期」。
+
+### 说明
+
+- 自动读取需要访问系统钥匙串（macOS）以解密本地登录态，首次会弹窗，点「始终允许」后不再询问；
+  自动读取目前仅支持 macOS，其它平台请手动设置 `accessToken`。
+- 扩展**不调用 refreshToken**：CodeBuddy 自己会刷新并写回最新 token，扩展每次重读即可，
+  避免两边互相轮换把登录态挤掉。
+
 ## [0.8.3]
 
 ### 新增

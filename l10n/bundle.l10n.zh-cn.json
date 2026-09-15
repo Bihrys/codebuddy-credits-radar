@@ -55,5 +55,20 @@
   "CodeBuddy Usage: Failed to save credentials ({0})": "CodeBuddy Usage: 凭证保存失败（{0}）",
   "CodeBuddy Usage: Credentials saved (local only), active UA: {0}": "CodeBuddy Usage: 凭证已保存（仅存于本地），生效 UA：{0}",
   "CodeBuddy Usage: Credentials saved (local only), active UA: {0} (built-in default)": "CodeBuddy Usage: 凭证已保存（仅存于本地），生效 UA：{0}（内置默认值）",
-  "unknown version": "未知版本"
+  "unknown version": "未知版本",
+
+  "No credentials found": "未找到登录凭据",
+  "Sign in to CodeBuddy, or set an Access Token manually": "请先登录 CodeBuddy，或手动设置 Access Token",
+  "Login expired": "登录已过期",
+  "CodeBuddy login expired — sign in again, or set an Access Token manually": "CodeBuddy 登录已过期 — 请重新登录，或手动设置 Access Token",
+
+  "`✓ Auto token · {0}`": "`✓ 自动 Token · {0}`",
+  "`✓ Token · {0}`": "`✓ 手动 Token · {0}`",
+  "`⚠ Cookie (legacy)`": "`⚠ Cookie（旧模式）`",
+  "`⚠ No credentials`": "`⚠ 未配置凭据`",
+
+  "Access Token (optional fallback)": "Access Token（可选兜底）",
+  "Leave empty to auto-read from the CodeBuddy sign-in state. Normally you do NOT need to set this.": "留空即自动读取 CodeBuddy 登录态。通常无需手动设置。",
+  "CodeBuddy Usage: Access Token saved": "CodeBuddy Usage: Access Token 已保存",
+  "CodeBuddy Usage: Access Token cleared, using auto-read": "CodeBuddy Usage: Access Token 已清除，改为自动读取"
 }

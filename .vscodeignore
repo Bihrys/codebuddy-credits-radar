@@ -14,3 +14,6 @@ package-lock.json
 # README 中的截图走 GitHub 远程加载（raw.githubusercontent.com），
 # 扩展详情页的 webview 无法解析包内相对路径，故不再随包发布
 resources/docs/**
+
+# 本地登录态分析文档，仅用于开发排查，不随包发布
+CodeBuddy登录信息存储分析.md
