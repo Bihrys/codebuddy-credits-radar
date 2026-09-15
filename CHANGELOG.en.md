@@ -4,7 +4,7 @@
 
 All notable changes are documented in this file.
 
-## [0.9.0]
+## [0.9.1]
 
 ### Added
 

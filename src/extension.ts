@@ -744,19 +744,22 @@ async function update() {
   }
 }
 
-/** 悬浮框中「鉴权」标签：展示凭据来源（自动读取 / 手动输入）与 token 有效期 */
+/**
+ * 悬浮框中「鉴权」标签：
+ * - 有凭据时只显示有效期截止日（能拉到积分本身就说明已登录，无需再写「已登录」）；
+ * - 读不到凭据时才提示「未登录」。
+ */
 function authTag(): string {
   const a = lastAuth;
   if (!a) return "";
   if (a.token) {
-    const d = a.expiresAt ? new Date(a.expiresAt) : undefined;
+    if (!a.expiresAt) return "";
+    const d = new Date(a.expiresAt);
     const p = (n: number) => String(n).padStart(2, "0");
-    const when = d ? `${p(d.getMonth() + 1)}-${p(d.getDate())}` : "?";
-    return a.mode === "token-auto"
-      ? t("`✓ Auto token · {0}`", when)
-      : t("`✓ Token · {0}`", when);
+    // 只给日期加行内代码样式，文案尽量短
+    return t("Until `{0}`", `${p(d.getMonth() + 1)}-${p(d.getDate())}`);
   }
-  return t("`⚠ No credentials`");
+  return t("`⚠ Not signed in`");
 }
 
 function checkinTag(): string {
@@ -851,9 +854,21 @@ function buildTooltip(res: UsageResult, updatedAt?: Date): vscode.MarkdownString
   const lines: string[] = [];
   lines.push(t("### CodeBuddy Credits"));
   lines.push(``);
-  lines.push(
-    t("Remaining: `{0}` / [{1}]({2}) ({3}%)", totalRemain, totalSize, plansUrl, pct.toFixed(1))
+  const remainLine = t(
+    "Remaining: `{0}` / [{1}]({2}) ({3}%)",
+    totalRemain,
+    totalSize,
+    plansUrl,
+    pct.toFixed(1)
   );
+  const auth = authTag();
+  if (auth) {
+    // 鉴权标签要贴在这一行的最右侧，而 Markdown 里只有表格能控制右对齐
+    lines.push(`| ${remainLine} | ${auth} |`);
+    lines.push(`| --- | ---: |`);
+  } else {
+    lines.push(remainLine);
+  }
   if (visible.length > 5) {
     lines.push(``);
     lines.push(t("_{0} packages, showing the first 5_", visible.length));
@@ -879,10 +894,9 @@ function buildTooltip(res: UsageResult, updatedAt?: Date): vscode.MarkdownString
     }
   }
   // 底部行并入同一张表：左列=签到标签 + 喵喵状态，末列=最近更新（右对齐贴右缘）
-  const auth = authTag();
   const tag = checkinTag();
   const buddy = buddyTag();
-  const left = [auth, tag, buddy].filter(Boolean).join("  ");
+  const left = [tag, buddy].filter(Boolean).join("  ");
   if (updatedAt) {
     lines.push(t("| {0} |  | Updated | {1} |", left, formatDateTime(updatedAt)));
   } else if (left) {

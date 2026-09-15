@@ -9,9 +9,8 @@
   "Login expired": "登录已过期",
   "CodeBuddy login expired — sign in again, or set an Access Token manually": "CodeBuddy 登录已过期 — 请重新登录，或手动设置 Access Token",
 
-  "`✓ Auto token · {0}`": "`✓ 自动 Token · {0}`",
-  "`✓ Token · {0}`": "`✓ 手动 Token · {0}`",
-  "`⚠ No credentials`": "`⚠ 未配置凭据`",
+  "Until `{0}`": "有效期至 `{0}`",
+  "`⚠ Not signed in`": "`⚠ 未登录`",
 
   "Access Token": "Access Token",
   "Paste the CodeBuddy accessToken (JWT). Normally the extension reads it automatically — fill this only when auto-read failed.": "粘贴 CodeBuddy 的 accessToken（JWT）。正常情况下扩展会自动读取，仅当自动读取失败时才需要填写。",
