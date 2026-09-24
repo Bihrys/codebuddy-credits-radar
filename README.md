@@ -4,6 +4,10 @@
 
 在 VS Code 状态栏显示你的 CodeBuddy 积分余量，顺手把每天能领的积分自动领了。
 
+> **关于本仓库**：这是 [wwenc6621/CodeBuddy-Usage](https://github.com/wwenc6621/CodeBuddy-Usage)
+> 的社区维护分支（MIT 协议，原作者版权声明见 [LICENSE](./LICENSE)），由 [@Bihrys](https://github.com/Bihrys) 维护。
+> 相对上游的差异见 [CHANGELOG](./CHANGELOG.md)。
+
 ---
 
 ## 开箱即用

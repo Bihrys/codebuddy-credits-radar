@@ -1,9 +1,9 @@
 {
   "name": "codebuddy-usage",
-  "displayName": "CodeBuddy Usage",
+  "displayName": "CodeBuddy Usage (社区版)",
   "description": "%extension.description%",
-  "publisher": "wwenc6621",
-  "version": "0.9.2",
+  "publisher": "bihrys",
+  "version": "0.9.3",
   "icon": "resources/icon.png",
   "license": "MIT",
   "keywords": [
@@ -21,13 +21,17 @@
     "theme": "dark"
   },
   "repository": {
-    "type": "git",
-    "url": "https://github.com/wwenc6621/CodeBuddy-Usage.git"
+  	"type": "git",
+  	"url": "https://github.com/Bihrys/codebuddy-usage.git"
   },
   "bugs": {
-    "url": "https://github.com/wwenc6621/CodeBuddy-Usage/issues"
+  	"url": "https://github.com/Bihrys/codebuddy-usage/issues"
   },
-  "homepage": "https://github.com/wwenc6621/CodeBuddy-Usage#readme",
+  "homepage": "https://github.com/Bihrys/codebuddy-usage#readme",
+  "author": {
+  	"name": "Bihrys",
+  	"url": "https://github.com/Bihrys"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },

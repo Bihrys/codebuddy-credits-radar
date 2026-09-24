@@ -107,6 +107,9 @@ const DEFAULT_PACKAGE_CODES = [
   "TCACA_code_028_NtpWi0jzXs",
   "TCACA_code_029_6wCGEWquYy",
   "TCACA_code_030_BjSt89qTvr",
+  // Buddy AI 个人标准版（70 元/月套餐）：此前缺失导致已购套餐被排除在统计之外，
+  // 用户消费积分后状态栏余量不下降（扣减发生在本包，而统计里没有它）
+  "TCACA_code_002_AkiJS3ZHF5",
 ];
 
 /**

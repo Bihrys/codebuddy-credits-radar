@@ -212,6 +212,10 @@ async function readWindowsKey(localStatePath: string): Promise<Buffer | undefine
     // 用 -EncodedCommand（UTF-16LE + base64）传脚本，彻底规避引号转义问题
     const script = [
       "$ErrorActionPreference='Stop'",
+      // Windows PowerShell 5.1 在部分环境下不会自动解析 System.Security 程序集，
+      // 直接引用会抛 "Unable to find type [System.Security.Cryptography.ProtectedData]"，
+      // 异常被 catch 吞掉后表现为凭据存储不可用、状态栏一直显示「未找到登录凭据」
+      "Add-Type -AssemblyName System.Security",
       `$b=[Convert]::FromBase64String('${protectedKey.toString("base64")}')`,
       "$k=[System.Security.Cryptography.ProtectedData]::Unprotect($b,$null,[System.Security.Cryptography.DataProtectionScope]::CurrentUser)",
       "[Console]::Out.Write([Convert]::ToBase64String($k))",

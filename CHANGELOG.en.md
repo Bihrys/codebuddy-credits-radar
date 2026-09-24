@@ -4,6 +4,22 @@
 
 All notable changes are documented in this file.
 
+## [0.9.3]
+
+> First release of the community-maintained fork ([@Bihrys](https://github.com/Bihrys)), based on upstream 0.9.2.
+
+### Fixed
+
+- **Auto-reading the login session always failed on some Windows setups**: the PowerShell
+  script that unwraps the DPAPI key did not explicitly load the `System.Security` assembly,
+  so environments that don't resolve it automatically threw
+  `Unable to find type [System.Security.Cryptography.ProtectedData]`. The error was swallowed
+  silently and surfaced as "no credentials found". The script now starts with
+  `Add-Type -AssemblyName System.Security`.
+- **Purchased plans excluded from the credits total**: the package whitelist was missing
+  `Buddy AI 个人标准版` (`TCACA_code_002_AkiJS3ZHF5`, the CNY 70/month plan), so the status bar
+  balance did not decrease as credits were consumed. It is now included.
+
 ## [0.9.2]
 
 ### Added

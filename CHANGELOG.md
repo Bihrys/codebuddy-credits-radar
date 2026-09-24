@@ -4,6 +4,20 @@
 
 所有值得注意的变更都会记录在此文件。
 
+## [0.9.3]
+
+> 社区维护分支（[@Bihrys](https://github.com/Bihrys)）起始版本，基于上游 0.9.2。
+
+### 修复
+
+- **Windows 自动读取登录态在部分环境必然失败**：读取 DPAPI 密钥的 PowerShell 脚本没有
+  显式加载 `System.Security` 程序集，在不会自动解析该程序集的环境下会抛
+  `Unable to find type [System.Security.Cryptography.ProtectedData]`，
+  异常被静默吞掉后表现为「未找到登录凭据」。现在脚本开头显式 `Add-Type -AssemblyName System.Security`。
+- **已购套餐被排除在积分统计之外**：套餐白名单缺少 `Buddy AI 个人标准版`
+  （`TCACA_code_002_AkiJS3ZHF5`，70 元/月套餐），导致消费积分后状态栏余量不下降。
+  现已补入。
+
 ## [0.9.2]
 
 ### 新增
