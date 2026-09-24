@@ -84,6 +84,7 @@
 | 显示「登录已过期」           | CodeBuddy 扩展登录失效，在 VS Code 里重新登录；或手动粘贴 Access Token  |
 | 显示「拉取失败」             | 点状态栏重试一次                                                       |
 | 数字一直不变                 | 点一下状态栏手动刷新                                                   |
+| 用掉积分但余量不下降         | 说明消费发生在未纳入统计的套餐上：运行命令「**Credits Radar: 检测套餐代码**」，勾选缺失的套餐即可（会写入 `extraPackageCodes` 设置并自动刷新） |
 | 提示要授权（macOS 钥匙串）   | 首次弹窗里点「始终允许」，之后不会再弹；仍不行就手动粘贴 Access Token    |
 | 用的是国际站                 | 设置里把 `apiBase` 改成 `https://www.workbuddy.ai`                      |
 
@@ -101,6 +102,7 @@
 | `autoCheckin`              | 开                           | 自动每日签到                                                           |
 | `buddyTravel`              | 开                           | 自动喵喵旅行                                                           |
 | `apiBase`                  | `https://www.workbuddy.cn` | 国内站；国际站填 `https://www.workbuddy.ai`                            |
+| `extraPackageCodes`        | 空                           | 额外纳入统计的套餐代码。通常留空：官方出新套餐导致余量不下降时，运行一次「**Credits Radar: 检测套餐代码**」命令即可自动补齐 |
 
 ## 安全
 

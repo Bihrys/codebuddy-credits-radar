@@ -4,6 +4,17 @@
 
 All notable changes are documented in this file.
 
+## [0.9.4]
+
+### Added
+
+- **New setting `codebuddyUsage.extraPackageCodes`**: include additional package codes beyond the
+  built-in list. The API filters by `PackageCodes`, so packages not listed are never counted.
+- **New command "Credits Radar: Detect uncounted package codes"**: compares every package on the
+  account against the current scope, then writes the selected codes into the setting and refreshes.
+  When a newly released package (e.g. a new monthly plan) makes the balance stop updating, one run
+  fixes it without waiting for a new release.
+
 ## [0.9.3]
 
 > First release of the community-maintained fork ([@Bihrys](https://github.com/Bihrys)), based on upstream 0.9.2.

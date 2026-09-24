@@ -5,11 +5,13 @@
   "command.openUsagePage": "Credits Radar: Open usage page",
   "command.buddyClaim": "Credits Radar: Buddy claim credits",
   "command.buddyDepart": "Credits Radar: Buddy depart",
+  "command.detectPackageCodes": "Credits Radar: Detect uncounted package codes",
   "config.title": "CodeBuddy Credits Radar",
   "config.accessToken": "Manual Access Token (JWT). Normally NOT needed — the extension reads the CodeBuddy extension's sign-in state automatically (macOS / Windows). Fill it only when auto-read fails (CodeBuddy extension not installed, Linux, or the credential store is unavailable). Stored locally only",
   "config.userAgent": "Browser User-Agent (stored locally only). Leave empty to use the built-in default",
   "config.refreshIntervalMinutes": "Auto refresh interval (minutes), 0 disables auto refresh",
   "config.autoCheckin": "Enable automatic daily check-in to claim credits (when disabled, no check-in runs and the hover tooltip hides the check-in status)",
+  "config.extraPackageCodes": "Extra package codes to include in the credits total (e.g. TCACA_code_002_AkiJS3ZHF5). Normally leave empty — run the \"Detect uncounted package codes\" command to find and add missing ones automatically",
   "config.apiBase": "API base URL (domestic .cn / international .ai)",
   "config.buddyTravel": "Enable buddy travel (send your buddy on tasks to earn credits automatically). When enabled, each refresh claims and dispatches the buddy automatically; the tooltip shows the travel countdown / claim / depart actions, once per day"
 }

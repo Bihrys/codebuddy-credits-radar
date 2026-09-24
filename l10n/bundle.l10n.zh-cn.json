@@ -41,6 +41,13 @@
   "Credits Radar: Buddy travel credits claimed": "Credits Radar: 喵喵旅行积分已领取",
   "Credits Radar: Your buddy has no travel credits to claim right now": "Credits Radar: 喵喵当前没有可领取的旅行积分",
 
+  "Credits Radar: All packages are already counted": "Credits Radar: 所有套餐都已在统计范围内",
+  "Credits Radar: Uncounted package codes detected": "Credits Radar: 检测到未纳入统计的套餐",
+  "Credits Radar: Select the packages to include in the credits total": "Credits Radar: 选择要纳入积分统计的套餐",
+  "Credits Radar: Remaining {0} credits — include this package in the total": "Credits Radar: 本周期剩余 {0} 积分 — 纳入统计",
+  "Credits Radar: Added {0} package code(s), refreshing…": "Credits Radar: 已添加 {0} 个套餐代码，正在刷新…",
+  "Credits Radar: Failed to detect package codes ({0})": "Credits Radar: 检测套餐代码失败（{0}）",
+
   "✿ `Unknown`": "✿ `未知`",
   "✿ Countdown {0}:{1}:{2}": "✿ 旅行倒计时 {0}:{1}:{2}",
   "✿ Done today · +{0}": "✿ 今日已完成 · 已领取 {0} 积分",

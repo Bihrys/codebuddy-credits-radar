@@ -78,6 +78,24 @@ const DEFAULT_PACKAGE_CODES = [
     "TCACA_code_002_AkiJS3ZHF5",
 ];
 /**
+ * 实际参与统计的套餐 code 列表 = 内置列表 + 设置里的 `extraPackageCodes`。
+ *
+ * 服务端按 PackageCodes 过滤返回，未列出的套餐不会出现在响应里，
+ * 也就不会被计入余量（用户消费这类套餐时表现为"余量不下降"）。
+ * 官方新增套餐时无需重新打包：用「检测套餐代码」命令找出缺失的 code，
+ * 或在设置里手动补充即可。
+ */
+function effectivePackageCodes() {
+    const extras = getConfig().get("extraPackageCodes", []) ?? [];
+    const codes = new Set(DEFAULT_PACKAGE_CODES);
+    for (const raw of extras) {
+        const code = String(raw ?? "").trim();
+        if (code)
+            codes.add(code);
+    }
+    return [...codes];
+}
+/**
  * 请求 UA：保持浏览器 UA 形态（部分网关对非浏览器 UA 更严格）。
  * accessToken 模式下 UA 不再与会话绑定，通常无需修改。
  */
@@ -178,7 +196,7 @@ async function fetchUsage() {
         ProductCode: "p_tcaca",
         Status: [0, 3],
         OnlyValidPeriod: true,
-        PackageCodes: DEFAULT_PACKAGE_CODES,
+        PackageCodes: effectivePackageCodes(),
         NeedInUsage: true,
     };
     const resp = await authFetch(`${apiBase}/billing/meter/get-user-resource`, {
@@ -224,6 +242,83 @@ async function fetchUsage() {
         }
     }
     return { remain, total, accounts };
+}
+/**
+ * 检测未被统计的套餐代码，并把选中的 code 追加写入设置 `codebuddyUsage.extraPackageCodes`。
+ *
+ * 原理：本次请求不带 PackageCodes 过滤，拿到账号下全部套餐，再与当前生效列表做差集。
+ * 官方新增套餐（如新的月付套餐）导致余量统计漏项时，用户跑一次本命令即可补齐，
+ * 无需等待扩展发新版。
+ */
+async function detectPackageCodes() {
+    const cfg = getConfig();
+    const apiBase = cfg.get("apiBase", "https://www.workbuddy.cn").replace(/\/$/, "");
+    try {
+        const resp = await authFetch(`${apiBase}/billing/meter/get-user-resource`, {
+            method: "POST",
+            headers: {
+                accept: "application/json, text/plain, */*",
+                "content-type": "application/json",
+                origin: apiBase,
+                referer: `${apiBase}/profile/plans-usage`,
+                "x-client-platform": "web",
+            },
+            body: JSON.stringify({
+                PageNumber: 1,
+                PageSize: 200,
+                ProductCode: "p_tcaca",
+                Status: [0, 3],
+                NeedInUsage: true,
+            }),
+        });
+        if (!resp.ok)
+            throw new Error(`HTTP_${resp.status}`);
+        const json = (await resp.json());
+        const accounts = json?.data?.Response?.Data?.Accounts ?? [];
+        const covered = new Set(effectivePackageCodes());
+        const missing = new Map();
+        for (const a of accounts) {
+            const code = String(a.PackageCode ?? "").trim();
+            if (!code || covered.has(code))
+                continue;
+            const remain = parseFloat(String(a.CycleCapacityRemainPrecise ?? a.CapacityRemainPrecise ?? "0")) || 0;
+            // 已用尽的套餐（多为过期包）不会影响余量，列出来只会干扰选择
+            if (remain <= 0)
+                continue;
+            const prev = missing.get(code);
+            missing.set(code, {
+                name: String(a.PackageName ?? ""),
+                remain: (prev?.remain ?? 0) + remain,
+            });
+        }
+        if (missing.size === 0) {
+            void vscode.window.showInformationMessage(t("Credits Radar: All packages are already counted"));
+            return;
+        }
+        const items = [...missing.entries()].map(([code, v]) => ({
+            label: code,
+            description: v.name,
+            detail: t("Credits Radar: Remaining {0} credits — include this package in the total", formatNumber(v.remain)),
+            code,
+        }));
+        const picked = await vscode.window.showQuickPick(items, {
+            title: t("Credits Radar: Uncounted package codes detected"),
+            placeHolder: t("Credits Radar: Select the packages to include in the credits total"),
+            canPickMany: true,
+        });
+        if (!picked || picked.length === 0)
+            return;
+        const existing = (cfg.get("extraPackageCodes", []) ?? [])
+            .map((s) => String(s ?? "").trim())
+            .filter(Boolean);
+        const merged = [...new Set([...existing, ...picked.map((p) => p.code)])];
+        await cfg.update("extraPackageCodes", merged, vscode.ConfigurationTarget.Global);
+        void vscode.window.showInformationMessage(t("Credits Radar: Added {0} package code(s), refreshing…", picked.length));
+        await update();
+    }
+    catch (e) {
+        void vscode.window.showWarningMessage(t("Credits Radar: Failed to detect package codes ({0})", e instanceof Error ? e.message : String(e)));
+    }
 }
 // ============================================================
 // 2. 签到（与用量查询共用 accessToken 鉴权）
@@ -987,6 +1082,7 @@ function activate(context) {
         const apiBase = getConfig().get("apiBase", "https://www.workbuddy.cn");
         vscode.env.openExternal(vscode.Uri.parse(`${apiBase}/profile/plans-usage`));
     }));
+    context.subscriptions.push(vscode.commands.registerCommand("codebuddyUsage.detectPackageCodes", () => detectPackageCodes()));
     context.subscriptions.push(vscode.commands.registerCommand("codebuddyUsage.buddyClaim", () => buddyClaimCmd()));
     context.subscriptions.push(vscode.commands.registerCommand("codebuddyUsage.buddyDepart", () => buddyDepartCmd()));
     update();

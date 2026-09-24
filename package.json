@@ -3,7 +3,7 @@
   "displayName": "CodeBuddy Credits Radar",
   "description": "%extension.description%",
   "publisher": "Bihrys",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "icon": "resources/icon.png",
   "license": "MIT",
   "keywords": [
@@ -64,6 +64,10 @@
       {
         "command": "codebuddyUsage.buddyDepart",
         "title": "%command.buddyDepart%"
+      },
+      {
+        "command": "codebuddyUsage.detectPackageCodes",
+        "title": "%command.detectPackageCodes%"
       }
     ],
     "configuration": {
@@ -88,6 +92,14 @@
           "type": "boolean",
           "default": true,
           "description": "%config.autoCheckin%"
+        },
+        "codebuddyUsage.extraPackageCodes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "%config.extraPackageCodes%"
         },
         "codebuddyUsage.apiBase": {
           "type": "string",
