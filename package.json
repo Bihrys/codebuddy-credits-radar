@@ -2,7 +2,7 @@
   "name": "codebuddy-usage",
   "displayName": "CodeBuddy Usage (社区版)",
   "description": "%extension.description%",
-  "publisher": "bihrys",
+  "publisher": "Bihrys",
   "version": "0.9.3",
   "icon": "resources/icon.png",
   "license": "MIT",
