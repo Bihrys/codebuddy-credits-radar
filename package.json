@@ -22,12 +22,12 @@
   },
   "repository": {
   	"type": "git",
-  	"url": "https://github.com/Bihrys/codebuddy-usage.git"
+  	"url": "https://github.com/Bihrys/codebuddy-usage-community.git"
   },
   "bugs": {
-  	"url": "https://github.com/Bihrys/codebuddy-usage/issues"
+  	"url": "https://github.com/Bihrys/codebuddy-usage-community/issues"
   },
-  "homepage": "https://github.com/Bihrys/codebuddy-usage#readme",
+  "homepage": "https://github.com/Bihrys/codebuddy-usage-community#readme",
   "author": {
   	"name": "Bihrys",
   	"url": "https://github.com/Bihrys"
