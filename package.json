@@ -1,9 +1,9 @@
 {
   "name": "codebuddy-credits-radar",
-  "displayName": "CodeBuddy Credits Radar",
+  "displayName": "CodeBuddy Radar",
   "description": "%extension.description%",
   "publisher": "Bihrys",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "icon": "resources/icon.png",
   "license": "MIT",
   "keywords": [

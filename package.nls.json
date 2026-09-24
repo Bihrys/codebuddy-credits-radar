@@ -6,7 +6,7 @@
   "command.buddyClaim": "Credits Radar: Buddy claim credits",
   "command.buddyDepart": "Credits Radar: Buddy depart",
   "command.detectPackageCodes": "Credits Radar: Detect uncounted package codes",
-  "config.title": "CodeBuddy Credits Radar",
+  "config.title": "CodeBuddy Radar",
   "config.accessToken": "Manual Access Token (JWT). Normally NOT needed — the extension reads the CodeBuddy extension's sign-in state automatically (macOS / Windows). Fill it only when auto-read fails (CodeBuddy extension not installed, Linux, or the credential store is unavailable). Stored locally only",
   "config.userAgent": "Browser User-Agent (stored locally only). Leave empty to use the built-in default",
   "config.refreshIntervalMinutes": "Auto refresh interval (minutes), 0 disables auto refresh",

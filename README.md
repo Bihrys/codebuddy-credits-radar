@@ -1,4 +1,4 @@
-# CodeBuddy Credits Radar（VS Code 扩展）
+# CodeBuddy Radar（VS Code 扩展）
 
 [English](./README.en.md) | 简体中文
 

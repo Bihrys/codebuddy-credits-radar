@@ -4,6 +4,13 @@
 
 All notable changes are documented in this file.
 
+## [0.9.5]
+
+### Changed
+
+- Display name shortened to **CodeBuddy Radar** (the extension ID and repository name stay
+  `codebuddy-credits-radar`: a published extension ID cannot change, the display name can).
+
 ## [0.9.4]
 
 ### Added

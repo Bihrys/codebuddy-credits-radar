@@ -6,7 +6,7 @@
   "command.buddyClaim": "Credits Radar: 喵喵领积分",
   "command.buddyDepart": "Credits Radar: 喵喵去旅行",
   "command.detectPackageCodes": "Credits Radar: 检测套餐代码（补齐未统计的套餐）",
-  "config.title": "CodeBuddy Credits Radar",
+  "config.title": "CodeBuddy Radar",
   "config.accessToken": "手动输入的 Access Token（JWT）。通常无需设置：扩展会自动读取 CodeBuddy 扩展的登录态（支持 macOS / Windows）。仅在自动读取失败时填写（未安装 CodeBuddy 扩展、Linux 系统、或系统凭据不可用）。仅存于本地",
   "config.userAgent": "浏览器 User-Agent（仅存于本地）。留空使用内置默认值",
   "config.refreshIntervalMinutes": "自动刷新间隔（分钟），0 表示不自动刷新",
