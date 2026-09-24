@@ -1,6 +1,6 @@
 {
-  "name": "codebuddy-usage",
-  "displayName": "CodeBuddy Usage (社区版)",
+  "name": "codebuddy-credits-radar",
+  "displayName": "CodeBuddy Credits Radar",
   "description": "%extension.description%",
   "publisher": "Bihrys",
   "version": "0.9.3",
@@ -22,12 +22,12 @@
   },
   "repository": {
   	"type": "git",
-  	"url": "https://github.com/Bihrys/codebuddy-usage-community.git"
+  	"url": "https://github.com/Bihrys/codebuddy-credits-radar.git"
   },
   "bugs": {
-  	"url": "https://github.com/Bihrys/codebuddy-usage-community/issues"
+  	"url": "https://github.com/Bihrys/codebuddy-credits-radar/issues"
   },
-  "homepage": "https://github.com/Bihrys/codebuddy-usage-community#readme",
+  "homepage": "https://github.com/Bihrys/codebuddy-credits-radar#readme",
   "author": {
   	"name": "Bihrys",
   	"url": "https://github.com/Bihrys"

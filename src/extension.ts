@@ -648,7 +648,7 @@ function notifyBuddyResult(buddy?: BuddyState) {
   } else if (buddy.freshlyClaimFailed && claim?.error) {
     // 失败警告受「一日一次」守卫限制，避免每 30 分钟刷新反复弹窗
     vscode.window.showWarningMessage(
-      t("CodeBuddy Usage: Failed to claim buddy credits ({0})", claim.error)
+      t("Credits Radar: Failed to claim buddy credits ({0})", claim.error)
     );
   }
 
@@ -656,13 +656,13 @@ function notifyBuddyResult(buddy?: BuddyState) {
     parts.push(t("Buddy departed, travel time {0} hours", depart.hours));
   } else if (depart?.error) {
     vscode.window.showWarningMessage(
-      t("CodeBuddy Usage: Buddy failed to depart ({0})", depart.error)
+      t("Credits Radar: Buddy failed to depart ({0})", depart.error)
     );
   }
 
   if (parts.length > 0) {
     vscode.window.showInformationMessage(
-      t("CodeBuddy Usage: Buddy travel — {0}", parts.join(", "))
+      t("Credits Radar: Buddy travel — {0}", parts.join(", "))
     );
   }
 }
@@ -676,7 +676,7 @@ async function update() {
   updating = true;
   // 立即给出刷新反馈，避免点击后“无变化”的错觉
   statusBarItem.text = `${icon("sync~spin")} ${t("Refreshing…")}`;
-  statusBarItem.tooltip = t("Fetching CodeBuddy usage…");
+  statusBarItem.tooltip = t("Fetching CodeBuddy credits…");
   statusBarItem.backgroundColor = undefined;
   statusBarItem.show();
 
@@ -705,12 +705,12 @@ async function update() {
     if (autoCheckin && checkin?.freshlyClaimed) {
       vscode.window.showInformationMessage(
         checkin.credit
-          ? t("CodeBuddy Usage: Daily check-in done (+{0})", checkin.credit)
-          : t("CodeBuddy Usage: Daily check-in done")
+          ? t("Credits Radar: Daily check-in done (+{0})", checkin.credit)
+          : t("Credits Radar: Daily check-in done")
       );
     } else if (autoCheckin && checkin?.state === "unclaimed") {
       vscode.window.showWarningMessage(
-        t("CodeBuddy Usage: Daily check-in failed, will retry later")
+        t("Credits Radar: Daily check-in failed, will retry later")
       );
     }
 
@@ -954,8 +954,8 @@ async function setAccessToken() {
   if (!trimmed) resetAutoReadBlock();
   vscode.window.showInformationMessage(
     trimmed
-      ? t("CodeBuddy Usage: Access Token saved")
-      : t("CodeBuddy Usage: Access Token cleared, retrying auto-read")
+      ? t("Credits Radar: Access Token saved")
+      : t("Credits Radar: Access Token cleared, retrying auto-read")
   );
   update();
 }
@@ -969,7 +969,7 @@ async function buddyClaimCmd() {
     if (c.error) {
       lastBuddy.claim = { error: c.error };
       vscode.window.showWarningMessage(
-        t("CodeBuddy Usage: Failed to claim buddy credits ({0})", c.error)
+        t("Credits Radar: Failed to claim buddy credits ({0})", c.error)
       );
     } else {
       let credit = c.credit;
@@ -980,17 +980,17 @@ async function buddyClaimCmd() {
       lastBuddy.claim = { credit: credit ?? 0 };
       if ((credit ?? 0) > 0) {
         vscode.window.showInformationMessage(
-          t("CodeBuddy Usage: Buddy claimed {0} credits", credit)
+          t("Credits Radar: Buddy claimed {0} credits", credit)
         );
       } else if (c.claimed) {
         // 已确认领取成功但拿不到数量：不能误报成「没有可领取」
         vscode.window.showInformationMessage(
-          t("CodeBuddy Usage: Buddy travel credits claimed")
+          t("Credits Radar: Buddy travel credits claimed")
         );
       } else {
         // 手动点击也要有反馈，否则点了「领积分」没有任何回应
         vscode.window.showInformationMessage(
-          t("CodeBuddy Usage: Your buddy has no travel credits to claim right now")
+          t("Credits Radar: Your buddy has no travel credits to claim right now")
         );
       }
     }
@@ -1006,7 +1006,7 @@ async function buddyClaimCmd() {
     }
     lastBuddy.claim = { error: e?.message ?? String(e) };
     vscode.window.showWarningMessage(
-      t("CodeBuddy Usage: Failed to claim buddy credits ({0})", e?.message ?? String(e))
+      t("Credits Radar: Failed to claim buddy credits ({0})", e?.message ?? String(e))
     );
   }
   const st = await fetchBuddyStatus();
@@ -1023,12 +1023,12 @@ async function buddyDepartCmd() {
     if (d.error) {
       lastBuddy.depart = { error: d.error };
       vscode.window.showWarningMessage(
-        t("CodeBuddy Usage: Buddy failed to depart ({0})", d.error)
+        t("Credits Radar: Buddy failed to depart ({0})", d.error)
       );
     } else {
       lastBuddy.depart = { hours: d.hours ?? 0 };
       vscode.window.showInformationMessage(
-        t("CodeBuddy Usage: Buddy departed, travel time {0} hours", d.hours ?? 0)
+        t("Credits Radar: Buddy departed, travel time {0} hours", d.hours ?? 0)
       );
     }
   } catch (e: any) {
@@ -1043,7 +1043,7 @@ async function buddyDepartCmd() {
     }
     lastBuddy.depart = { error: e?.message ?? String(e) };
     vscode.window.showWarningMessage(
-      t("CodeBuddy Usage: Buddy failed to depart ({0})", e?.message ?? String(e))
+      t("Credits Radar: Buddy failed to depart ({0})", e?.message ?? String(e))
     );
   }
   const st = await fetchBuddyStatus();

@@ -8,6 +8,12 @@
 
 > 社区维护分支（[@Bihrys](https://github.com/Bihrys)）起始版本，基于上游 0.9.2。
 
+### 变更
+
+- 项目更名为 **CodeBuddy Credits Radar**（技术名 `codebuddy-credits-radar`），
+  通知与命令前缀统一为 `Credits Radar:`。
+  设置项键名仍为 `codebuddyUsage.*`，既有配置无需改动。
+
 ### 修复
 
 - **Windows 自动读取登录态在部分环境必然失败**：读取 DPAPI 密钥的 PowerShell 脚本没有

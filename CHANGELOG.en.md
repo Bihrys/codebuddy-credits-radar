@@ -8,6 +8,12 @@ All notable changes are documented in this file.
 
 > First release of the community-maintained fork ([@Bihrys](https://github.com/Bihrys)), based on upstream 0.9.2.
 
+### Changed
+
+- Renamed to **CodeBuddy Credits Radar** (technical name `codebuddy-credits-radar`);
+  notification and command prefixes are now `Credits Radar:`.
+  Configuration keys remain `codebuddyUsage.*`, so existing settings keep working.
+
 ### Fixed
 
 - **Auto-reading the login session always failed on some Windows setups**: the PowerShell

@@ -1,6 +1,6 @@
 {
   "Refreshing…": "刷新中…",
-  "Fetching CodeBuddy usage…": "正在拉取 CodeBuddy 用量…",
+  "Fetching CodeBuddy credits…": "正在拉取 CodeBuddy 积分…",
   "Fetch failed": "拉取失败",
   "Error: {0}\nClick to retry": "错误: {0}\n点击重试",
 
@@ -14,12 +14,12 @@
 
   "Access Token": "Access Token",
   "Paste the Access Token of the CodeBuddy extension (JWT). It is read automatically when possible — fill this only when auto-read failed.": "粘贴 CodeBuddy 扩展的 Access Token（JWT）。正常情况下扩展会自动读取，仅当自动读取失败时才需要填写。",
-  "CodeBuddy Usage: Access Token saved": "CodeBuddy Usage: Access Token 已保存",
-  "CodeBuddy Usage: Access Token cleared, retrying auto-read": "CodeBuddy Usage: Access Token 已清除，将重新尝试自动读取",
+  "Credits Radar: Access Token saved": "Credits Radar: Access Token 已保存",
+  "Credits Radar: Access Token cleared, retrying auto-read": "Credits Radar: Access Token 已清除，将重新尝试自动读取",
 
-  "CodeBuddy Usage: Daily check-in done": "CodeBuddy Usage: 今日积分已签到",
-  "CodeBuddy Usage: Daily check-in done (+{0})": "CodeBuddy Usage: 今日积分已签到（+{0}）",
-  "CodeBuddy Usage: Daily check-in failed, will retry later": "CodeBuddy Usage: 今日积分签到失败，稍后重试",
+  "Credits Radar: Daily check-in done": "Credits Radar: 今日积分已签到",
+  "Credits Radar: Daily check-in done (+{0})": "Credits Radar: 今日积分已签到（+{0}）",
+  "Credits Radar: Daily check-in failed, will retry later": "Credits Radar: 今日积分签到失败，稍后重试",
 
   "`❔ Unknown`": "`❔ 未知`",
   "`✓ Checked in`": "`✓ 已签到`",
@@ -32,14 +32,14 @@
   "{0} claimed": "已领取 {0} 积分",
   "Travel {0}h": "旅行时长 {0} 小时",
   "Buddy departed, travel time {0} hours": "喵喵已出发，旅行时长 {0} 小时",
-  "CodeBuddy Usage: Buddy travel — {0}": "CodeBuddy Usage: 喵喵旅行 — {0}",
-  "CodeBuddy Usage: Failed to claim buddy credits ({0})": "CodeBuddy Usage: 喵喵领积分失败（{0}）",
-  "CodeBuddy Usage: Buddy departed, travel time {0} hours": "CodeBuddy Usage: 喵喵已出发，旅行时长 {0} 小时",
-  "CodeBuddy Usage: Buddy failed to depart ({0})": "CodeBuddy Usage: 喵喵出发失败（{0}）",
-  "CodeBuddy Usage: Buddy claimed {0} credits": "CodeBuddy Usage: 喵喵已领取 {0} 积分",
+  "Credits Radar: Buddy travel — {0}": "Credits Radar: 喵喵旅行 — {0}",
+  "Credits Radar: Failed to claim buddy credits ({0})": "Credits Radar: 喵喵领积分失败（{0}）",
+  "Credits Radar: Buddy departed, travel time {0} hours": "Credits Radar: 喵喵已出发，旅行时长 {0} 小时",
+  "Credits Radar: Buddy failed to depart ({0})": "Credits Radar: 喵喵出发失败（{0}）",
+  "Credits Radar: Buddy claimed {0} credits": "Credits Radar: 喵喵已领取 {0} 积分",
   "Buddy travel credits claimed": "喵喵旅行积分已领取",
-  "CodeBuddy Usage: Buddy travel credits claimed": "CodeBuddy Usage: 喵喵旅行积分已领取",
-  "CodeBuddy Usage: Your buddy has no travel credits to claim right now": "CodeBuddy Usage: 喵喵当前没有可领取的旅行积分",
+  "Credits Radar: Buddy travel credits claimed": "Credits Radar: 喵喵旅行积分已领取",
+  "Credits Radar: Your buddy has no travel credits to claim right now": "Credits Radar: 喵喵当前没有可领取的旅行积分",
 
   "✿ `Unknown`": "✿ `未知`",
   "✿ Countdown {0}:{1}:{2}": "✿ 旅行倒计时 {0}:{1}:{2}",

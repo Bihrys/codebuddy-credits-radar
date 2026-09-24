@@ -1,4 +1,4 @@
-# CodeBuddy Usage (VS Code Extension)
+# CodeBuddy Credits Radar (VS Code Extension)
 
 [简体中文](./README.md) | English
 

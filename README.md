@@ -1,8 +1,10 @@
-# CodeBuddy Usage（VS Code 扩展）
+# CodeBuddy Credits Radar（VS Code 扩展）
 
 [English](./README.en.md) | 简体中文
 
 在 VS Code 状态栏显示你的 CodeBuddy 积分余量，顺手把每天能领的积分自动领了。
+
+> **积分雷达（Credits Radar）** —— 实时盯住余额变化，签到与喵喵旅行奖励自动到账。
 
 > **关于本仓库**：这是 [wwenc6621/CodeBuddy-Usage](https://github.com/wwenc6621/CodeBuddy-Usage)
 > 的社区维护分支（MIT 协议，原作者版权声明见 [LICENSE](./LICENSE)），由 [@Bihrys](https://github.com/Bihrys) 维护。
